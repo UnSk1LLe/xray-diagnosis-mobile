@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -12,8 +12,8 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { User, Calendar, MapPin } from "lucide-react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { User } from "lucide-react-native";
+import { getProfile, updateProfile } from "@/utils/backendApi";
 
 export default function PersonalInfo() {
   const [formData, setFormData] = useState({
@@ -26,42 +26,103 @@ export default function PersonalInfo() {
     medicalHistory: "",
   });
   const [loading, setLoading] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadProfile = async () => {
+      try {
+        const profile = await getProfile();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setFormData({
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          dateOfBirth: profile.dateOfBirth,
+          gender: profile.gender,
+          address: profile.address,
+          emergencyContact: profile.emergencyContact,
+          medicalHistory: profile.medicalHistory,
+        });
+      } catch {
+        if (isMounted) {
+          router.replace("/auth/phone");
+        }
+      } finally {
+        if (isMounted) {
+          setLoadingProfile(false);
+        }
+      }
+    };
+
+    loadProfile();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
   const handleInputChange = (field, value) => {
-    setFormData((prev) => ({
-      ...prev,
+    setFormData((previous) => ({
+      ...previous,
       [field]: value,
     }));
   };
 
   const handleSubmit = async () => {
-    // Basic validation
-    if (
-      !formData.firstName.trim() ||
-      !formData.lastName.trim() ||
-      !formData.dateOfBirth.trim()
-    ) {
-      Alert.alert("Error", "Please fill in all required fields");
+    if (!formData.firstName.trim() || !formData.lastName.trim()) {
+      Alert.alert("Error", "Please fill in your first and last name");
       return;
     }
 
     setLoading(true);
 
     try {
-      // Save personal info to local storage
-      await AsyncStorage.setItem("personalInfo", JSON.stringify(formData));
-      await AsyncStorage.setItem("hasCompletedOnboarding", "true");
+      await updateProfile({
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        dateOfBirth: formData.dateOfBirth.trim(),
+        gender: formData.gender.trim(),
+        address: formData.address.trim(),
+        emergencyContact: formData.emergencyContact.trim(),
+        medicalHistory: formData.medicalHistory.trim(),
+      });
 
-      // Navigate to main app
       router.replace("/(tabs)");
     } catch (error) {
-      Alert.alert("Error", "Failed to save information. Please try again.");
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "Failed to save information. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  if (loadingProfile) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "#ffffff",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ fontSize: 16, color: "#6b7280" }}>
+          Loading profile...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -78,7 +139,6 @@ export default function PersonalInfo() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={{ alignItems: "center", marginBottom: 40 }}>
           <View
             style={{
@@ -116,9 +176,7 @@ export default function PersonalInfo() {
           </Text>
         </View>
 
-        {/* Form Fields */}
         <View style={{ marginBottom: 32 }}>
-          {/* Name Fields */}
           <View style={{ flexDirection: "row", marginBottom: 20, gap: 12 }}>
             <View style={{ flex: 1 }}>
               <Text
@@ -178,7 +236,6 @@ export default function PersonalInfo() {
             </View>
           </View>
 
-          {/* Date of Birth */}
           <View style={{ marginBottom: 20 }}>
             <Text
               style={{
@@ -188,7 +245,7 @@ export default function PersonalInfo() {
                 marginBottom: 8,
               }}
             >
-              Date of Birth *
+              Date of Birth
             </Text>
             <TextInput
               style={{
@@ -208,7 +265,6 @@ export default function PersonalInfo() {
             />
           </View>
 
-          {/* Gender */}
           <View style={{ marginBottom: 20 }}>
             <Text
               style={{
@@ -251,7 +307,6 @@ export default function PersonalInfo() {
             </View>
           </View>
 
-          {/* Address */}
           <View style={{ marginBottom: 20 }}>
             <Text
               style={{
@@ -282,7 +337,6 @@ export default function PersonalInfo() {
             />
           </View>
 
-          {/* Emergency Contact */}
           <View style={{ marginBottom: 20 }}>
             <Text
               style={{
@@ -315,7 +369,6 @@ export default function PersonalInfo() {
             />
           </View>
 
-          {/* Medical History */}
           <View style={{ marginBottom: 32 }}>
             <Text
               style={{
@@ -351,7 +404,6 @@ export default function PersonalInfo() {
           </View>
         </View>
 
-        {/* Submit Button */}
         <TouchableOpacity
           style={{
             backgroundColor: loading ? "#9ca3af" : "#2563eb",

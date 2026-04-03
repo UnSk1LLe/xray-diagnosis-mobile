@@ -1,44 +1,57 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import { Camera, FileText, Activity, Clock, Plus } from "lucide-react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getProfile, listReports } from "@/utils/backendApi";
 
 export default function HomeScreen() {
-  const [personalInfo, setPersonalInfo] = useState(null);
-  const [recentReports, setRecentReports] = useState([]);
+  const [profile, setProfile] = useState(null);
+  const [reports, setReports] = useState([]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  useEffect(() => {
-    loadUserData();
-    loadRecentReports();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
 
-  const loadUserData = async () => {
-    try {
-      const info = await AsyncStorage.getItem("personalInfo");
-      if (info) {
-        setPersonalInfo(JSON.parse(info));
-      }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-    }
-  };
+      const loadDashboard = async () => {
+        try {
+          const [profileData, reportsData] = await Promise.all([
+            getProfile(),
+            listReports(),
+          ]);
 
-  const loadRecentReports = async () => {
-    try {
-      const reports = await AsyncStorage.getItem("xrayReports");
-      if (reports) {
-        const parsedReports = JSON.parse(reports);
-        setRecentReports(parsedReports.slice(0, 3)); // Show only 3 most recent
-      }
-    } catch (error) {
-      console.error("Error loading reports:", error);
-    }
-  };
+          if (!isMounted) {
+            return;
+          }
+
+          setProfile(profileData);
+          setReports(reportsData);
+        } catch (error) {
+          if (isMounted) {
+            console.error("Error loading dashboard:", error);
+            router.replace("/auth/phone");
+          }
+        }
+      };
+
+      loadDashboard();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [router]),
+  );
+
+  const recentReports = reports.slice(0, 3);
+  const normalResults = reports.filter((report) => report.status === "Normal").length;
+  const abnormalResults = reports.filter(
+    (report) =>
+      report.status !== "Normal" && report.status !== "Processing",
+  ).length;
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -61,7 +74,6 @@ export default function HomeScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={{ marginBottom: 32 }}>
           <Text
             style={{
@@ -71,7 +83,7 @@ export default function HomeScreen() {
               marginBottom: 8,
             }}
           >
-            Hello, {personalInfo?.firstName || "User"}
+            Hello, {profile?.firstName || "User"}
           </Text>
           <Text
             style={{
@@ -84,7 +96,6 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* Quick Actions */}
         <View style={{ marginBottom: 32 }}>
           <Text
             style={{
@@ -105,7 +116,7 @@ export default function HomeScreen() {
                 padding: 20,
                 alignItems: "center",
               }}
-              onPress={() => router.push("/scan")}
+              onPress={() => router.push("/(tabs)/scan")}
             >
               <View
                 style={{
@@ -140,7 +151,7 @@ export default function HomeScreen() {
                 padding: 20,
                 alignItems: "center",
               }}
-              onPress={() => router.push("/reports")}
+              onPress={() => router.push("/(tabs)/reports")}
             >
               <View
                 style={{
@@ -169,7 +180,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Health Stats */}
         <View style={{ marginBottom: 32 }}>
           <Text
             style={{
@@ -205,7 +215,7 @@ export default function HomeScreen() {
                     color: "#2563eb",
                   }}
                 >
-                  {recentReports.length}
+                  {reports.length}
                 </Text>
                 <Text
                   style={{
@@ -224,7 +234,7 @@ export default function HomeScreen() {
                     color: "#16a34a",
                   }}
                 >
-                  {recentReports.filter((r) => r.status === "Normal").length}
+                  {normalResults}
                 </Text>
                 <Text
                   style={{
@@ -243,7 +253,7 @@ export default function HomeScreen() {
                     color: "#d97706",
                   }}
                 >
-                  {recentReports.filter((r) => r.status !== "Normal").length}
+                  {abnormalResults}
                 </Text>
                 <Text
                   style={{
@@ -258,7 +268,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Recent Reports */}
         <View style={{ marginBottom: 32 }}>
           <View
             style={{
@@ -277,8 +286,8 @@ export default function HomeScreen() {
             >
               Recent Reports
             </Text>
-            {recentReports.length > 0 && (
-              <TouchableOpacity onPress={() => router.push("/reports")}>
+            {recentReports.length > 0 ? (
+              <TouchableOpacity onPress={() => router.push("/(tabs)/reports")}>
                 <Text
                   style={{
                     fontSize: 14,
@@ -289,7 +298,7 @@ export default function HomeScreen() {
                   View All
                 </Text>
               </TouchableOpacity>
-            )}
+            ) : null}
           </View>
 
           {recentReports.length === 0 ? (
@@ -336,7 +345,7 @@ export default function HomeScreen() {
                   alignItems: "center",
                   gap: 8,
                 }}
-                onPress={() => router.push("/scan")}
+                onPress={() => router.push("/(tabs)/scan")}
               >
                 <Plus size={16} color="#ffffff" />
                 <Text
@@ -352,9 +361,9 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={{ gap: 12 }}>
-              {recentReports.map((report, index) => (
+              {recentReports.map((report) => (
                 <TouchableOpacity
-                  key={index}
+                  key={report.id}
                   style={{
                     backgroundColor: "#ffffff",
                     borderRadius: 12,
@@ -364,7 +373,12 @@ export default function HomeScreen() {
                     flexDirection: "row",
                     alignItems: "center",
                   }}
-                  onPress={() => router.push(`/reports/${report.id}`)}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/report-result",
+                      params: { reportId: report.id },
+                    })
+                  }
                 >
                   <View
                     style={{

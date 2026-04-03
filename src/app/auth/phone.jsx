@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Phone } from "lucide-react-native";
+import { normalizePhone, requestOTP } from "@/utils/backendApi";
 
 export default function PhoneAuth() {
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -20,12 +21,14 @@ export default function PhoneAuth() {
   const insets = useSafeAreaInsets();
 
   const handleSendOTP = async () => {
-    if (!phoneNumber.trim()) {
+    const phone = normalizePhone(phoneNumber);
+
+    if (!phone) {
       Alert.alert("Error", "Please enter your phone number");
       return;
     }
 
-    if (phoneNumber.length < 10) {
+    if (phone.replace(/\D/g, "").length < 10) {
       Alert.alert("Error", "Please enter a valid phone number");
       return;
     }
@@ -33,16 +36,22 @@ export default function PhoneAuth() {
     setLoading(true);
 
     try {
-      // Simulate API call for OTP
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await requestOTP(phone);
 
-      // Navigate to OTP screen with phone number
       router.push({
         pathname: "/auth/otp",
-        params: { phoneNumber },
+        params: {
+          phone: response.phone,
+          devOtpCode: response.otpCode,
+        },
       });
     } catch (error) {
-      Alert.alert("Error", "Failed to send OTP. Please try again.");
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "Failed to send OTP. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -62,7 +71,6 @@ export default function PhoneAuth() {
           paddingBottom: insets.bottom + 24,
         }}
       >
-        {/* Header */}
         <View style={{ alignItems: "center", marginBottom: 60 }}>
           <View
             style={{
@@ -101,7 +109,6 @@ export default function PhoneAuth() {
           </Text>
         </View>
 
-        {/* Phone Input */}
         <View style={{ marginBottom: 32 }}>
           <Text
             style={{
@@ -133,7 +140,6 @@ export default function PhoneAuth() {
           />
         </View>
 
-        {/* Send OTP Button */}
         <TouchableOpacity
           style={{
             backgroundColor: loading ? "#9ca3af" : "#2563eb",
@@ -156,7 +162,6 @@ export default function PhoneAuth() {
           </Text>
         </TouchableOpacity>
 
-        {/* Footer */}
         <View style={{ flex: 1, justifyContent: "flex-end" }}>
           <Text
             style={{

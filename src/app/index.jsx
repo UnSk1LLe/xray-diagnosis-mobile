@@ -1,35 +1,42 @@
 import { useEffect } from "react";
 import { View, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getCurrentUser } from "@/utils/backendApi";
 
 export default function Index() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    const checkAuthStatus = async () => {
-      try {
-        const isAuthenticated = await AsyncStorage.getItem("isAuthenticated");
-        const hasCompletedOnboarding = await AsyncStorage.getItem(
-          "hasCompletedOnboarding",
-        );
+    let isMounted = true;
 
-        if (!isAuthenticated) {
-          router.replace("/auth/phone");
-        } else if (!hasCompletedOnboarding) {
-          router.replace("/onboarding/personal-info");
-        } else {
-          router.replace("/(tabs)");
+    const bootstrap = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+
+        if (!isMounted) {
+          return;
         }
-      } catch (error) {
-        console.error("Error checking auth status:", error);
-        router.replace("/auth/phone");
+
+        if (!currentUser.hasCompletedProfile) {
+          router.replace("/onboarding/personal-info");
+          return;
+        }
+
+        router.replace("/(tabs)");
+      } catch {
+        if (isMounted) {
+          router.replace("/auth/phone");
+        }
       }
     };
 
-    checkAuthStatus();
+    bootstrap();
+
+    return () => {
+      isMounted = false;
+    };
   }, [router]);
 
   return (

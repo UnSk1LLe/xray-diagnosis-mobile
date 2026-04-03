@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   User,
   Edit,
@@ -10,49 +12,58 @@ import {
   HelpCircle,
   LogOut,
   Phone,
-  Mail,
   MapPin,
   Calendar,
 } from "lucide-react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  getProfile,
+  getProfileStats,
+  logoutUser,
+} from "@/utils/backendApi";
 
 export default function ProfileScreen() {
-  const [personalInfo, setPersonalInfo] = useState(null);
-  const [stats, setStats] = useState({ totalScans: 0, normalResults: 0 });
+  const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState({
+    totalScans: 0,
+    normalResults: 0,
+    abnormalResults: 0,
+    processing: 0,
+  });
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  useEffect(() => {
-    loadUserData();
-    loadStats();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
 
-  const loadUserData = async () => {
-    try {
-      const info = await AsyncStorage.getItem("personalInfo");
-      if (info) {
-        setPersonalInfo(JSON.parse(info));
-      }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-    }
-  };
+      const loadProfileData = async () => {
+        try {
+          const [profileData, statsData] = await Promise.all([
+            getProfile(),
+            getProfileStats(),
+          ]);
 
-  const loadStats = async () => {
-    try {
-      const reports = await AsyncStorage.getItem("xrayReports");
-      if (reports) {
-        const parsedReports = JSON.parse(reports);
-        setStats({
-          totalScans: parsedReports.length,
-          normalResults: parsedReports.filter((r) => r.status === "Normal")
-            .length,
-        });
-      }
-    } catch (error) {
-      console.error("Error loading stats:", error);
-    }
-  };
+          if (!isMounted) {
+            return;
+          }
+
+          setProfile(profileData);
+          setStats(statsData);
+        } catch (error) {
+          if (isMounted) {
+            console.error("Error loading profile:", error);
+            router.replace("/auth/phone");
+          }
+        }
+      };
+
+      loadProfileData();
+
+      return () => {
+        isMounted = false;
+      };
+    }, [router]),
+  );
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -62,6 +73,10 @@ export default function ProfileScreen() {
         style: "destructive",
         onPress: async () => {
           try {
+            await logoutUser();
+          } catch (error) {
+            console.error("Logout error:", error);
+          } finally {
             await AsyncStorage.multiRemove([
               "isAuthenticated",
               "hasCompletedOnboarding",
@@ -69,8 +84,6 @@ export default function ProfileScreen() {
               "xrayReports",
             ]);
             router.replace("/auth/phone");
-          } catch (error) {
-            Alert.alert("Error", "Failed to logout");
           }
         },
       },
@@ -78,10 +91,7 @@ export default function ProfileScreen() {
   };
 
   const editProfile = () => {
-    Alert.alert(
-      "Edit Profile",
-      "Profile editing functionality would be implemented here",
-    );
+    router.push("/onboarding/personal-info");
   };
 
   const showSettings = () => {
@@ -107,7 +117,6 @@ export default function ProfileScreen() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={{ alignItems: "center", marginBottom: 32 }}>
           <View
             style={{
@@ -130,9 +139,7 @@ export default function ProfileScreen() {
               marginBottom: 4,
             }}
           >
-            {personalInfo
-              ? `${personalInfo.firstName} ${personalInfo.lastName}`
-              : "User"}
+            {profile ? `${profile.firstName} ${profile.lastName}`.trim() : "User"}
           </Text>
           <Text
             style={{
@@ -144,7 +151,6 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
-        {/* Stats Cards */}
         <View
           style={{
             flexDirection: "row",
@@ -212,8 +218,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Personal Information */}
-        {personalInfo && (
+        {profile ? (
           <View style={{ marginBottom: 32 }}>
             <View
               style={{
@@ -253,7 +258,41 @@ export default function ProfileScreen() {
                 borderColor: "#e2e8f0",
               }}
             >
-              {personalInfo.dateOfBirth && (
+              {profile.phone ? (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#e5e7eb",
+                  }}
+                >
+                  <Phone size={20} color="#6b7280" />
+                  <View style={{ marginLeft: 12 }}>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: "#6b7280",
+                        marginBottom: 2,
+                      }}
+                    >
+                      Phone
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        color: "#111827",
+                        fontWeight: "500",
+                      }}
+                    >
+                      {profile.phone}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {profile.dateOfBirth ? (
                 <View
                   style={{
                     flexDirection: "row",
@@ -281,13 +320,13 @@ export default function ProfileScreen() {
                         fontWeight: "500",
                       }}
                     >
-                      {personalInfo.dateOfBirth}
+                      {profile.dateOfBirth}
                     </Text>
                   </View>
                 </View>
-              )}
+              ) : null}
 
-              {personalInfo.gender && (
+              {profile.gender ? (
                 <View
                   style={{
                     flexDirection: "row",
@@ -315,13 +354,13 @@ export default function ProfileScreen() {
                         fontWeight: "500",
                       }}
                     >
-                      {personalInfo.gender}
+                      {profile.gender}
                     </Text>
                   </View>
                 </View>
-              )}
+              ) : null}
 
-              {personalInfo.address && (
+              {profile.address ? (
                 <View
                   style={{
                     flexDirection: "row",
@@ -350,13 +389,13 @@ export default function ProfileScreen() {
                         lineHeight: 22,
                       }}
                     >
-                      {personalInfo.address}
+                      {profile.address}
                     </Text>
                   </View>
                 </View>
-              )}
+              ) : null}
 
-              {personalInfo.emergencyContact && (
+              {profile.emergencyContact ? (
                 <View
                   style={{
                     flexDirection: "row",
@@ -382,16 +421,15 @@ export default function ProfileScreen() {
                         fontWeight: "500",
                       }}
                     >
-                      {personalInfo.emergencyContact}
+                      {profile.emergencyContact}
                     </Text>
                   </View>
                 </View>
-              )}
+              ) : null}
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* Menu Options */}
         <View style={{ marginBottom: 32 }}>
           <Text
             style={{
@@ -433,7 +471,7 @@ export default function ProfileScreen() {
               >
                 App Settings
               </Text>
-              <Text style={{ color: "#9ca3af" }}>›</Text>
+              <Text style={{ color: "#9ca3af" }}>{">"}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -457,7 +495,7 @@ export default function ProfileScreen() {
               >
                 Help & Support
               </Text>
-              <Text style={{ color: "#9ca3af" }}>›</Text>
+              <Text style={{ color: "#9ca3af" }}>{">"}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -479,12 +517,11 @@ export default function ProfileScreen() {
               >
                 Logout
               </Text>
-              <Text style={{ color: "#9ca3af" }}>›</Text>
+              <Text style={{ color: "#9ca3af" }}>{">"}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* App Info */}
         <View
           style={{
             backgroundColor: "#f9fafb",

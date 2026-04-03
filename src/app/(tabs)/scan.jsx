@@ -17,13 +17,11 @@ import {
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
-import useUpload from "@/utils/useUpload";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createReport } from "@/utils/backendApi";
 
 export default function ScanScreen() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [upload, { loading: uploading }] = useUpload();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -49,7 +47,7 @@ export default function ScanScreen() {
       if (!result.canceled && result.assets[0]) {
         setSelectedImage(result.assets[0]);
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to pick image from library");
     }
   };
@@ -74,7 +72,7 @@ export default function ScanScreen() {
       if (!result.canceled && result.assets[0]) {
         setSelectedImage(result.assets[0]);
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to take photo");
     }
   };
@@ -88,58 +86,20 @@ export default function ScanScreen() {
     setAnalyzing(true);
 
     try {
-      // Upload the image
-      const uploadResult = await upload({
-        reactNativeAsset: {
-          uri: selectedImage.uri,
-          name: selectedImage.fileName || "xray.jpg",
-          mimeType: selectedImage.mimeType || "image/jpeg",
-        },
-      });
+      const response = await createReport(selectedImage);
 
-      if (uploadResult.error) {
-        throw new Error(uploadResult.error);
-      }
-
-      // Simulate AI analysis
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // Generate mock AI report
-      const mockReport = {
-        id: Date.now().toString(),
-        date: new Date().toISOString(),
-        imageUrl: uploadResult.url,
-        status: Math.random() > 0.3 ? "Normal" : "Abnormal findings detected",
-        findings: [
-          "Lungs appear clear with no signs of consolidation",
-          "Heart size within normal limits",
-          "No pleural effusion detected",
-          "Bone structures appear intact",
-        ],
-        recommendations: [
-          "Continue regular health monitoring",
-          "Maintain healthy lifestyle habits",
-          "Follow up with healthcare provider if symptoms persist",
-        ],
-        confidence: Math.floor(Math.random() * 20) + 80, // 80-99%
-        aiAnalysis:
-          "The chest X-ray shows normal lung fields with clear costophrenic angles. The cardiac silhouette appears within normal limits. No acute cardiopulmonary abnormalities are identified.",
-      };
-
-      // Save report to local storage
-      const existingReports = await AsyncStorage.getItem("xrayReports");
-      const reports = existingReports ? JSON.parse(existingReports) : [];
-      reports.unshift(mockReport);
-      await AsyncStorage.setItem("xrayReports", JSON.stringify(reports));
-
-      // Navigate to report view
       router.push({
         pathname: "/report-result",
-        params: { reportId: mockReport.id },
+        params: { reportId: String(response.reportId) },
       });
     } catch (error) {
       console.error("Analysis error:", error);
-      Alert.alert("Error", "Failed to analyze X-ray. Please try again.");
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "Failed to analyze X-ray. Please try again.",
+      );
     } finally {
       setAnalyzing(false);
     }
@@ -160,7 +120,6 @@ export default function ScanScreen() {
           paddingBottom: insets.bottom + 100,
         }}
       >
-        {/* Header */}
         <View style={{ marginBottom: 32 }}>
           <Text
             style={{
@@ -183,7 +142,6 @@ export default function ScanScreen() {
           </Text>
         </View>
 
-        {/* Image Preview */}
         {selectedImage ? (
           <View style={{ marginBottom: 32 }}>
             <View
@@ -223,12 +181,11 @@ export default function ScanScreen() {
                 }}
                 onPress={resetSelection}
               >
-                <Text style={{ fontSize: 18, color: "#6b7280" }}>×</Text>
+                <Text style={{ fontSize: 18, color: "#6b7280" }}>X</Text>
               </TouchableOpacity>
             </View>
           </View>
         ) : (
-          /* Upload Options */
           <View style={{ flex: 1, justifyContent: "center", marginBottom: 32 }}>
             <View
               style={{
@@ -320,8 +277,7 @@ export default function ScanScreen() {
           </View>
         )}
 
-        {/* Analyze Button */}
-        {selectedImage && (
+        {selectedImage ? (
           <View style={{ marginTop: "auto" }}>
             <TouchableOpacity
               style={{
@@ -334,7 +290,7 @@ export default function ScanScreen() {
                 gap: 12,
               }}
               onPress={analyzeXRay}
-              disabled={analyzing || uploading}
+              disabled={analyzing}
             >
               {analyzing ? (
                 <>
@@ -346,20 +302,7 @@ export default function ScanScreen() {
                       fontWeight: "600",
                     }}
                   >
-                    Analyzing X-Ray...
-                  </Text>
-                </>
-              ) : uploading ? (
-                <>
-                  <ActivityIndicator size="small" color="#ffffff" />
-                  <Text
-                    style={{
-                      color: "#ffffff",
-                      fontSize: 16,
-                      fontWeight: "600",
-                    }}
-                  >
-                    Uploading...
+                    Uploading and queueing report...
                   </Text>
                 </>
               ) : (
@@ -390,7 +333,7 @@ export default function ScanScreen() {
               Analysis typically takes 30-60 seconds
             </Text>
           </View>
-        )}
+        ) : null}
       </View>
     </View>
   );

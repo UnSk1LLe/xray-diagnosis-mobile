@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -18,43 +18,81 @@ import {
   AlertTriangle,
   Share2,
   Download,
-  FileText,
 } from "lucide-react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
+import { asString, getReport } from "@/utils/backendApi";
+
+function getStatusStyle(status) {
+  if (status === "Normal") {
+    return {
+      background: "#f0fdf4",
+      border: "#bbf7d0",
+      text: "#16a34a",
+      icon: "normal",
+    };
+  }
+
+  if (status === "Processing") {
+    return {
+      background: "#eff6ff",
+      border: "#bfdbfe",
+      text: "#2563eb",
+      icon: "processing",
+    };
+  }
+
+  return {
+    background: "#fef3c7",
+    border: "#fde68a",
+    text: "#d97706",
+    icon: "alert",
+  };
+}
 
 export default function ReportResult() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { reportId } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const reportId = asString(params.reportId);
 
   useEffect(() => {
-    loadReport();
-  }, [reportId]);
+    let isMounted = true;
 
-  const loadReport = async () => {
-    try {
-      const reports = await AsyncStorage.getItem("xrayReports");
-      if (reports) {
-        const parsedReports = JSON.parse(reports);
-        const foundReport = parsedReports.find((r) => r.id === reportId);
-        if (foundReport) {
-          setReport(foundReport);
-        } else {
-          Alert.alert("Error", "Report not found");
+    const loadReport = async () => {
+      if (!reportId) {
+        router.back();
+        return;
+      }
+
+      try {
+        const reportData = await getReport(reportId);
+
+        if (isMounted) {
+          setReport(reportData);
+        }
+      } catch (error) {
+        if (isMounted) {
+          Alert.alert(
+            "Error",
+            error instanceof Error ? error.message : "Failed to load report",
+          );
           router.back();
         }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error("Error loading report:", error);
-      Alert.alert("Error", "Failed to load report");
-      router.back();
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    loadReport();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [reportId, router]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -69,16 +107,34 @@ export default function ReportResult() {
   };
 
   const shareReport = async () => {
-    if (!report) return;
+    if (!report) {
+      return;
+    }
 
     try {
-      const shareContent = `HealthScan X-Ray Report\n\nDate: ${formatDate(report.date)}\nStatus: ${report.status}\nConfidence: ${report.confidence}%\n\nFindings:\n${report.findings.map((f) => `• ${f}`).join("\n")}\n\nRecommendations:\n${report.recommendations.map((r) => `• ${r}`).join("\n")}`;
+      const findings = report.findings.map((item) => `- ${item}`).join("\n");
+      const recommendations = report.recommendations
+        .map((item) => `- ${item}`)
+        .join("\n");
+
+      const shareContent = [
+        "HealthScan X-Ray Report",
+        "",
+        `Date: ${formatDate(report.date)}`,
+        `Status: ${report.status}`,
+        report.confidence ? `Confidence: ${report.confidence}%` : null,
+        "",
+        findings ? `Findings:\n${findings}` : null,
+        recommendations ? `Recommendations:\n${recommendations}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
 
       await Share.share({
         message: shareContent,
         title: "HealthScan X-Ray Report",
       });
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to share report");
     }
   };
@@ -124,7 +180,7 @@ export default function ReportResult() {
     );
   }
 
-  const isNormal = report.status === "Normal";
+  const statusStyle = getStatusStyle(report.status);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
@@ -138,7 +194,6 @@ export default function ReportResult() {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View
           style={{
             flexDirection: "row",
@@ -201,15 +256,14 @@ export default function ReportResult() {
           </View>
         </View>
 
-        {/* Status Card */}
         <View
           style={{
-            backgroundColor: isNormal ? "#f0fdf4" : "#fef3c7",
+            backgroundColor: statusStyle.background,
             borderRadius: 16,
             padding: 20,
             marginBottom: 24,
             borderWidth: 1,
-            borderColor: isNormal ? "#bbf7d0" : "#fde68a",
+            borderColor: statusStyle.border,
           }}
         >
           <View
@@ -219,16 +273,16 @@ export default function ReportResult() {
               marginBottom: 12,
             }}
           >
-            {isNormal ? (
-              <CheckCircle size={24} color="#16a34a" />
+            {statusStyle.icon === "normal" ? (
+              <CheckCircle size={24} color={statusStyle.text} />
             ) : (
-              <AlertTriangle size={24} color="#d97706" />
+              <AlertTriangle size={24} color={statusStyle.text} />
             )}
             <Text
               style={{
                 fontSize: 20,
                 fontWeight: "700",
-                color: isNormal ? "#16a34a" : "#d97706",
+                color: statusStyle.text,
                 marginLeft: 12,
               }}
             >
@@ -244,19 +298,20 @@ export default function ReportResult() {
                 {formatDate(report.date)}
               </Text>
             </View>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              <Activity size={16} color="#6b7280" />
-              <Text style={{ fontSize: 14, color: "#6b7280" }}>
-                {report.confidence}% confidence
-              </Text>
-            </View>
+            {report.confidence ? (
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+              >
+                <Activity size={16} color="#6b7280" />
+                <Text style={{ fontSize: 14, color: "#6b7280" }}>
+                  {report.confidence}% confidence
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
-        {/* X-Ray Image */}
-        {report.imageUrl && (
+        {report.imageUrl ? (
           <View style={{ marginBottom: 24 }}>
             <Text
               style={{
@@ -288,10 +343,9 @@ export default function ReportResult() {
               />
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* AI Analysis */}
-        {report.aiAnalysis && (
+        {report.aiAnalysis ? (
           <View style={{ marginBottom: 24 }}>
             <Text
               style={{
@@ -323,10 +377,9 @@ export default function ReportResult() {
               </Text>
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* Findings */}
-        {report.findings && report.findings.length > 0 && (
+        {report.findings.length > 0 ? (
           <View style={{ marginBottom: 24 }}>
             <Text
               style={{
@@ -348,11 +401,10 @@ export default function ReportResult() {
             >
               {report.findings.map((finding, index) => (
                 <View
-                  key={index}
+                  key={`${finding}-${index}`}
                   style={{
                     padding: 16,
-                    borderBottomWidth:
-                      index < report.findings.length - 1 ? 1 : 0,
+                    borderBottomWidth: index < report.findings.length - 1 ? 1 : 0,
                     borderBottomColor: "#e5e7eb",
                     flexDirection: "row",
                     alignItems: "flex-start",
@@ -382,10 +434,9 @@ export default function ReportResult() {
               ))}
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* Recommendations */}
-        {report.recommendations && report.recommendations.length > 0 && (
+        {report.recommendations.length > 0 ? (
           <View style={{ marginBottom: 24 }}>
             <Text
               style={{
@@ -407,7 +458,7 @@ export default function ReportResult() {
             >
               {report.recommendations.map((recommendation, index) => (
                 <View
-                  key={index}
+                  key={`${recommendation}-${index}`}
                   style={{
                     padding: 16,
                     borderBottomWidth:
@@ -441,9 +492,8 @@ export default function ReportResult() {
               ))}
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* Disclaimer */}
         <View
           style={{
             backgroundColor: "#fef3c7",

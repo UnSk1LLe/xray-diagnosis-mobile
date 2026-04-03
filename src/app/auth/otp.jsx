@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -12,40 +12,71 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { ArrowLeft, Shield } from "lucide-react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  asString,
+  requestOTP,
+  verifyOTP,
+} from "@/utils/backendApi";
+
+const OTP_LENGTH = 4;
 
 export default function OTPVerification() {
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [otp, setOtp] = useState(Array.from({ length: OTP_LENGTH }, () => ""));
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [timer, setTimer] = useState(30);
+  const [devOtpCode, setDevOtpCode] = useState("");
   const router = useRouter();
-  const { phoneNumber } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const phone = asString(params.phone);
   const insets = useSafeAreaInsets();
   const inputRefs = useRef([]);
 
   useEffect(() => {
+    setDevOtpCode(asString(params.devOtpCode));
+  }, [params.devOtpCode]);
+
+  useEffect(() => {
+    if (!phone) {
+      router.replace("/auth/phone");
+    }
+  }, [phone, router]);
+
+  useEffect(() => {
     if (timer > 0) {
       const interval = setInterval(() => {
-        setTimer(timer - 1);
+        setTimer((currentTimer) => currentTimer - 1);
       }, 1000);
+
       return () => clearInterval(interval);
     }
   }, [timer]);
 
   const handleOtpChange = (value, index) => {
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
+    const digits = value.replace(/\D/g, "");
+    const nextOtp = [...otp];
 
-    // Auto-focus next input
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
+    if (!digits) {
+      nextOtp[index] = "";
+      setOtp(nextOtp);
+      return;
     }
+
+    digits
+      .slice(0, OTP_LENGTH - index)
+      .split("")
+      .forEach((digit, offset) => {
+        nextOtp[index + offset] = digit;
+      });
+
+    setOtp(nextOtp);
+
+    const nextIndex = Math.min(index + digits.length, OTP_LENGTH - 1);
+    inputRefs.current[nextIndex]?.focus();
   };
 
-  const handleKeyPress = (e, index) => {
-    if (e.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
+  const handleKeyPress = (event, index) => {
+    if (event.nativeEvent.key === "Backspace" && !otp[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
@@ -53,26 +84,29 @@ export default function OTPVerification() {
   const handleVerifyOTP = async () => {
     const otpCode = otp.join("");
 
-    if (otpCode.length !== 6) {
-      Alert.alert("Error", "Please enter the complete OTP");
+    if (otpCode.length !== OTP_LENGTH) {
+      Alert.alert("Error", "Please enter the complete 4-digit OTP");
       return;
     }
 
     setLoading(true);
 
     try {
-      // Simulate API call for OTP verification
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      const response = await verifyOTP(phone, otpCode);
 
-      // For demo purposes, accept any 6-digit OTP
-      if (otpCode.length === 6) {
-        await AsyncStorage.setItem("isAuthenticated", "true");
-        router.replace("/onboarding/personal-info");
-      } else {
-        Alert.alert("Error", "Invalid OTP. Please try again.");
+      if (response.user.hasCompletedProfile) {
+        router.replace("/(tabs)");
+        return;
       }
+
+      router.replace("/onboarding/personal-info");
     } catch (error) {
-      Alert.alert("Error", "Failed to verify OTP. Please try again.");
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "Failed to verify OTP. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -80,13 +114,19 @@ export default function OTPVerification() {
 
   const handleResendOTP = async () => {
     setResendLoading(true);
+
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const response = await requestOTP(phone);
+      setDevOtpCode(response.otpCode);
       setTimer(30);
+      setOtp(Array.from({ length: OTP_LENGTH }, () => ""));
+      inputRefs.current[0]?.focus();
       Alert.alert("Success", "OTP sent successfully");
     } catch (error) {
-      Alert.alert("Error", "Failed to resend OTP");
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to resend OTP",
+      );
     } finally {
       setResendLoading(false);
     }
@@ -106,7 +146,6 @@ export default function OTPVerification() {
           paddingBottom: insets.bottom + 24,
         }}
       >
-        {/* Header */}
         <View
           style={{
             flexDirection: "row",
@@ -129,7 +168,6 @@ export default function OTPVerification() {
           </TouchableOpacity>
         </View>
 
-        {/* Content */}
         <View style={{ alignItems: "center", marginBottom: 60 }}>
           <View
             style={{
@@ -163,29 +201,41 @@ export default function OTPVerification() {
               lineHeight: 24,
             }}
           >
-            We've sent a 6-digit code to{"\n"}
-            <Text style={{ fontWeight: "600", color: "#374151" }}>
-              {phoneNumber}
-            </Text>
+            We've sent a 4-digit code to{"\n"}
+            <Text style={{ fontWeight: "600", color: "#374151" }}>{phone}</Text>
           </Text>
+          {devOtpCode ? (
+            <Text
+              style={{
+                marginTop: 16,
+                fontSize: 14,
+                color: "#2563eb",
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+            >
+              Development OTP: {devOtpCode}
+            </Text>
+          ) : null}
         </View>
 
-        {/* OTP Input */}
         <View
           style={{
             flexDirection: "row",
             justifyContent: "space-between",
             marginBottom: 32,
-            paddingHorizontal: 20,
+            paddingHorizontal: 32,
           }}
         >
           {otp.map((digit, index) => (
             <TextInput
               key={index}
-              ref={(ref) => (inputRefs.current[index] = ref)}
+              ref={(ref) => {
+                inputRefs.current[index] = ref;
+              }}
               style={{
-                width: 45,
-                height: 55,
+                width: 52,
+                height: 56,
                 borderWidth: 2,
                 borderColor: digit ? "#2563eb" : "#e5e7eb",
                 borderRadius: 12,
@@ -197,15 +247,14 @@ export default function OTPVerification() {
               }}
               value={digit}
               onChangeText={(value) => handleOtpChange(value, index)}
-              onKeyPress={(e) => handleKeyPress(e, index)}
+              onKeyPress={(event) => handleKeyPress(event, index)}
               keyboardType="number-pad"
-              maxLength={1}
+              maxLength={OTP_LENGTH}
               selectTextOnFocus
             />
           ))}
         </View>
 
-        {/* Verify Button */}
         <TouchableOpacity
           style={{
             backgroundColor: loading ? "#9ca3af" : "#2563eb",
@@ -228,7 +277,6 @@ export default function OTPVerification() {
           </Text>
         </TouchableOpacity>
 
-        {/* Resend OTP */}
         <View style={{ alignItems: "center" }}>
           {timer > 0 ? (
             <Text
