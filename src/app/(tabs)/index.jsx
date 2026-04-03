@@ -1,0 +1,445 @@
+import { useState, useEffect } from "react";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
+import { Camera, FileText, Activity, Clock, Plus } from "lucide-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+export default function HomeScreen() {
+  const [personalInfo, setPersonalInfo] = useState(null);
+  const [recentReports, setRecentReports] = useState([]);
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  useEffect(() => {
+    loadUserData();
+    loadRecentReports();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const info = await AsyncStorage.getItem("personalInfo");
+      if (info) {
+        setPersonalInfo(JSON.parse(info));
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error);
+    }
+  };
+
+  const loadRecentReports = async () => {
+    try {
+      const reports = await AsyncStorage.getItem("xrayReports");
+      if (reports) {
+        const parsedReports = JSON.parse(reports);
+        setRecentReports(parsedReports.slice(0, 3)); // Show only 3 most recent
+      }
+    } catch (error) {
+      console.error("Error loading reports:", error);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
+      <StatusBar style="dark" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 20,
+          paddingHorizontal: 24,
+          paddingBottom: insets.bottom + 100,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={{ marginBottom: 32 }}>
+          <Text
+            style={{
+              fontSize: 32,
+              fontWeight: "700",
+              color: "#111827",
+              marginBottom: 8,
+            }}
+          >
+            Hello, {personalInfo?.firstName || "User"}
+          </Text>
+          <Text
+            style={{
+              fontSize: 16,
+              color: "#6b7280",
+              lineHeight: 24,
+            }}
+          >
+            Welcome back to HealthScan. How can we help you today?
+          </Text>
+        </View>
+
+        {/* Quick Actions */}
+        <View style={{ marginBottom: 32 }}>
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: "600",
+              color: "#111827",
+              marginBottom: 16,
+            }}
+          >
+            Quick Actions
+          </Text>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: "#eff6ff",
+                borderRadius: 16,
+                padding: 20,
+                alignItems: "center",
+              }}
+              onPress={() => router.push("/scan")}
+            >
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  backgroundColor: "#2563eb",
+                  borderRadius: 24,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <Camera size={24} color="#ffffff" />
+              </View>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "600",
+                  color: "#2563eb",
+                  textAlign: "center",
+                }}
+              >
+                Scan X-Ray
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                backgroundColor: "#f0fdf4",
+                borderRadius: 16,
+                padding: 20,
+                alignItems: "center",
+              }}
+              onPress={() => router.push("/reports")}
+            >
+              <View
+                style={{
+                  width: 48,
+                  height: 48,
+                  backgroundColor: "#16a34a",
+                  borderRadius: 24,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <FileText size={24} color="#ffffff" />
+              </View>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "600",
+                  color: "#16a34a",
+                  textAlign: "center",
+                }}
+              >
+                View Reports
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Health Stats */}
+        <View style={{ marginBottom: 32 }}>
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: "600",
+              color: "#111827",
+              marginBottom: 16,
+            }}
+          >
+            Health Overview
+          </Text>
+          <View
+            style={{
+              backgroundColor: "#f8fafc",
+              borderRadius: 16,
+              padding: 20,
+              borderWidth: 1,
+              borderColor: "#e2e8f0",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 16,
+              }}
+            >
+              <View style={{ alignItems: "center" }}>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: "700",
+                    color: "#2563eb",
+                  }}
+                >
+                  {recentReports.length}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: "#6b7280",
+                  }}
+                >
+                  Total Scans
+                </Text>
+              </View>
+              <View style={{ alignItems: "center" }}>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: "700",
+                    color: "#16a34a",
+                  }}
+                >
+                  {recentReports.filter((r) => r.status === "Normal").length}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: "#6b7280",
+                  }}
+                >
+                  Normal Results
+                </Text>
+              </View>
+              <View style={{ alignItems: "center" }}>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: "700",
+                    color: "#d97706",
+                  }}
+                >
+                  {recentReports.filter((r) => r.status !== "Normal").length}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: "#6b7280",
+                  }}
+                >
+                  Needs Review
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Recent Reports */}
+        <View style={{ marginBottom: 32 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 16,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 20,
+                fontWeight: "600",
+                color: "#111827",
+              }}
+            >
+              Recent Reports
+            </Text>
+            {recentReports.length > 0 && (
+              <TouchableOpacity onPress={() => router.push("/reports")}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: "#2563eb",
+                    fontWeight: "500",
+                  }}
+                >
+                  View All
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {recentReports.length === 0 ? (
+            <View
+              style={{
+                backgroundColor: "#f9fafb",
+                borderRadius: 16,
+                padding: 32,
+                alignItems: "center",
+                borderWidth: 1,
+                borderColor: "#e5e7eb",
+                borderStyle: "dashed",
+              }}
+            >
+              <FileText size={48} color="#9ca3af" />
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "500",
+                  color: "#6b7280",
+                  marginTop: 12,
+                  marginBottom: 8,
+                }}
+              >
+                No reports yet
+              </Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: "#9ca3af",
+                  textAlign: "center",
+                  marginBottom: 16,
+                }}
+              >
+                Upload your first X-ray scan to get started
+              </Text>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: "#2563eb",
+                  borderRadius: 8,
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+                onPress={() => router.push("/scan")}
+              >
+                <Plus size={16} color="#ffffff" />
+                <Text
+                  style={{
+                    color: "#ffffff",
+                    fontSize: 14,
+                    fontWeight: "500",
+                  }}
+                >
+                  Scan Now
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ gap: 12 }}>
+              {recentReports.map((report, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={{
+                    backgroundColor: "#ffffff",
+                    borderRadius: 12,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: "#e5e7eb",
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                  onPress={() => router.push(`/reports/${report.id}`)}
+                >
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      backgroundColor:
+                        report.status === "Normal" ? "#dcfce7" : "#fef3c7",
+                      borderRadius: 20,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginRight: 12,
+                    }}
+                  >
+                    <Activity
+                      size={20}
+                      color={report.status === "Normal" ? "#16a34a" : "#d97706"}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: "600",
+                        color: "#111827",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Chest X-Ray Report
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <Clock size={14} color="#6b7280" />
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: "#6b7280",
+                        }}
+                      >
+                        {formatDate(report.date)}
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor:
+                            report.status === "Normal" ? "#dcfce7" : "#fef3c7",
+                          paddingHorizontal: 8,
+                          paddingVertical: 2,
+                          borderRadius: 12,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "500",
+                            color:
+                              report.status === "Normal"
+                                ? "#16a34a"
+                                : "#d97706",
+                          }}
+                        >
+                          {report.status}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
