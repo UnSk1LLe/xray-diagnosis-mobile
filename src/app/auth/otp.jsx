@@ -7,6 +7,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +18,7 @@ import {
   requestOTP,
   verifyOTP,
 } from "@/utils/backendApi";
+import { useAppTheme } from "@/utils/theme";
 
 const OTP_LENGTH = 4;
 
@@ -31,6 +33,7 @@ export default function OTPVerification() {
   const phone = asString(params.phone);
   const insets = useSafeAreaInsets();
   const inputRefs = useRef([]);
+  const { colors, statusBarStyle } = useAppTheme();
 
   useEffect(() => {
     setDevOtpCode(asString(params.devOtpCode));
@@ -134,59 +137,63 @@ export default function OTPVerification() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#ffffff" }}
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
     >
-      <StatusBar style="dark" />
-      <View
-        style={{
-          flex: 1,
+      <StatusBar style={statusBarStyle} />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          flexGrow: 1,
           paddingTop: insets.top + 20,
           paddingHorizontal: 24,
           paddingBottom: insets.bottom + 24,
         }}
+        keyboardShouldPersistTaps="handled"
       >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 40,
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => router.back()}
+        <View style={{ alignItems: "center", marginBottom: 60 }}>
+          <View
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: "#f3f4f6",
-              justifyContent: "center",
+              alignSelf: "stretch",
+              flexDirection: "row",
               alignItems: "center",
+              marginBottom: 40,
             }}
           >
-            <ArrowLeft size={20} color="#374151" />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 20,
+                backgroundColor: colors.elevatedSurface,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <ArrowLeft size={20} color={colors.text} />
+            </TouchableOpacity>
+          </View>
 
-        <View style={{ alignItems: "center", marginBottom: 60 }}>
           <View
             style={{
               width: 80,
               height: 80,
-              backgroundColor: "#dcfce7",
+              backgroundColor: colors.successSoft,
               borderRadius: 40,
               justifyContent: "center",
               alignItems: "center",
               marginBottom: 24,
             }}
           >
-            <Shield size={32} color="#16a34a" />
+            <Shield size={32} color={colors.success} />
           </View>
           <Text
             style={{
               fontSize: 28,
               fontWeight: "700",
-              color: "#111827",
+              color: colors.text,
               textAlign: "center",
               marginBottom: 8,
             }}
@@ -196,20 +203,20 @@ export default function OTPVerification() {
           <Text
             style={{
               fontSize: 16,
-              color: "#6b7280",
+              color: colors.mutedText,
               textAlign: "center",
               lineHeight: 24,
             }}
           >
             We've sent a 4-digit code to{"\n"}
-            <Text style={{ fontWeight: "600", color: "#374151" }}>{phone}</Text>
+            <Text style={{ fontWeight: "600", color: colors.text }}>{phone}</Text>
           </Text>
           {devOtpCode ? (
             <Text
               style={{
                 marginTop: 16,
                 fontSize: 14,
-                color: "#2563eb",
+                color: colors.primary,
                 fontWeight: "600",
                 textAlign: "center",
               }}
@@ -237,13 +244,13 @@ export default function OTPVerification() {
                 width: 52,
                 height: 56,
                 borderWidth: 2,
-                borderColor: digit ? "#2563eb" : "#e5e7eb",
+                borderColor: digit ? colors.primary : colors.border,
                 borderRadius: 12,
                 textAlign: "center",
                 fontSize: 20,
                 fontWeight: "600",
-                color: "#111827",
-                backgroundColor: digit ? "#eff6ff" : "#f9fafb",
+                color: colors.text,
+                backgroundColor: digit ? colors.primarySoft : colors.softSurface,
               }}
               value={digit}
               onChangeText={(value) => handleOtpChange(value, index)}
@@ -251,60 +258,64 @@ export default function OTPVerification() {
               keyboardType="number-pad"
               maxLength={OTP_LENGTH}
               selectTextOnFocus
+              returnKeyType="done"
+              textContentType="oneTimeCode"
             />
           ))}
         </View>
 
-        <TouchableOpacity
-          style={{
-            backgroundColor: loading ? "#9ca3af" : "#2563eb",
-            borderRadius: 12,
-            paddingVertical: 16,
-            alignItems: "center",
-            marginBottom: 24,
-          }}
-          onPress={handleVerifyOTP}
-          disabled={loading}
-        >
-          <Text
+        <View style={{ marginTop: "auto" }}>
+          <TouchableOpacity
             style={{
-              color: "#ffffff",
-              fontSize: 16,
-              fontWeight: "600",
+              backgroundColor: loading ? colors.subtleText : colors.primary,
+              borderRadius: 12,
+              paddingVertical: 16,
+              alignItems: "center",
+              marginBottom: 24,
             }}
+            onPress={handleVerifyOTP}
+            disabled={loading}
           >
-            {loading ? "Verifying..." : "Verify OTP"}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={{ alignItems: "center" }}>
-          {timer > 0 ? (
             <Text
               style={{
-                fontSize: 14,
-                color: "#6b7280",
+                color: "#ffffff",
+                fontSize: 16,
+                fontWeight: "600",
               }}
             >
-              Resend OTP in {timer}s
+              {loading ? "Verifying..." : "Verify OTP"}
             </Text>
-          ) : (
-            <TouchableOpacity
-              onPress={handleResendOTP}
-              disabled={resendLoading}
-            >
+          </TouchableOpacity>
+
+          <View style={{ alignItems: "center" }}>
+            {timer > 0 ? (
               <Text
                 style={{
                   fontSize: 14,
-                  color: "#2563eb",
-                  fontWeight: "600",
+                  color: colors.mutedText,
                 }}
               >
-                {resendLoading ? "Sending..." : "Resend OTP"}
+                Resend OTP in {timer}s
               </Text>
-            </TouchableOpacity>
-          )}
+            ) : (
+              <TouchableOpacity
+                onPress={handleResendOTP}
+                disabled={resendLoading}
+              >
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: colors.primary,
+                    fontWeight: "600",
+                  }}
+                >
+                  {resendLoading ? "Sending..." : "Resend OTP"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

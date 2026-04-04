@@ -13,23 +13,55 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Phone } from "lucide-react-native";
 import { normalizePhone, requestOTP } from "@/utils/backendApi";
+import { useAppTheme } from "@/utils/theme";
+
+function formatKazakhPhoneInput(value) {
+  const digits = value.replace(/\D/g, "");
+  const normalizedDigits = digits.startsWith("7")
+    ? digits
+    : digits.startsWith("8")
+      ? `7${digits.slice(1)}`
+      : `7${digits}`;
+  const trimmedDigits = normalizedDigits.slice(0, 11);
+  const localDigits = trimmedDigits.slice(1);
+  const parts = [];
+
+  if (localDigits.length > 0) {
+    parts.push(localDigits.slice(0, 3));
+  }
+
+  if (localDigits.length > 3) {
+    parts.push(localDigits.slice(3, 6));
+  }
+
+  if (localDigits.length > 6) {
+    parts.push(localDigits.slice(6, 8));
+  }
+
+  if (localDigits.length > 8) {
+    parts.push(localDigits.slice(8, 10));
+  }
+
+  return `+7${parts.length ? `-${parts.join("-")}` : ""}`;
+}
 
 export default function PhoneAuth() {
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("+7");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, statusBarStyle } = useAppTheme();
 
   const handleSendOTP = async () => {
     const phone = normalizePhone(phoneNumber);
 
-    if (!phone) {
+    if (!phone || phone === "+7") {
       Alert.alert("Error", "Please enter your phone number");
       return;
     }
 
-    if (phone.replace(/\D/g, "").length < 10) {
-      Alert.alert("Error", "Please enter a valid phone number");
+    if (!/^\+7\d{10}$/.test(phone)) {
+      Alert.alert("Error", "Please enter a valid phone number in +7 format");
       return;
     }
 
@@ -59,10 +91,10 @@ export default function PhoneAuth() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#ffffff" }}
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <View
         style={{
           flex: 1,
@@ -76,20 +108,20 @@ export default function PhoneAuth() {
             style={{
               width: 80,
               height: 80,
-              backgroundColor: "#eff6ff",
+              backgroundColor: colors.primarySoft,
               borderRadius: 40,
               justifyContent: "center",
               alignItems: "center",
               marginBottom: 24,
             }}
           >
-            <Phone size={32} color="#2563eb" />
+            <Phone size={32} color={colors.primary} />
           </View>
           <Text
             style={{
               fontSize: 28,
               fontWeight: "700",
-              color: "#111827",
+              color: colors.text,
               textAlign: "center",
               marginBottom: 8,
             }}
@@ -99,7 +131,7 @@ export default function PhoneAuth() {
           <Text
             style={{
               fontSize: 16,
-              color: "#6b7280",
+              color: colors.mutedText,
               textAlign: "center",
               lineHeight: 24,
             }}
@@ -114,7 +146,7 @@ export default function PhoneAuth() {
             style={{
               fontSize: 16,
               fontWeight: "600",
-              color: "#374151",
+              color: colors.text,
               marginBottom: 8,
             }}
           >
@@ -122,19 +154,19 @@ export default function PhoneAuth() {
           </Text>
           <TextInput
             style={{
-              backgroundColor: "#f9fafb",
+              backgroundColor: colors.softSurface,
               borderWidth: 1,
-              borderColor: "#e5e7eb",
+              borderColor: colors.border,
               borderRadius: 12,
               paddingHorizontal: 16,
               paddingVertical: 16,
               fontSize: 16,
-              color: "#111827",
+              color: colors.text,
             }}
             placeholder="Enter your phone number"
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor={colors.subtleText}
             value={phoneNumber}
-            onChangeText={setPhoneNumber}
+            onChangeText={(value) => setPhoneNumber(formatKazakhPhoneInput(value))}
             keyboardType="phone-pad"
             autoFocus
           />
@@ -142,7 +174,7 @@ export default function PhoneAuth() {
 
         <TouchableOpacity
           style={{
-            backgroundColor: loading ? "#9ca3af" : "#2563eb",
+            backgroundColor: loading ? colors.subtleText : colors.primary,
             borderRadius: 12,
             paddingVertical: 16,
             alignItems: "center",
@@ -166,7 +198,7 @@ export default function PhoneAuth() {
           <Text
             style={{
               fontSize: 14,
-              color: "#6b7280",
+              color: colors.mutedText,
               textAlign: "center",
               lineHeight: 20,
             }}

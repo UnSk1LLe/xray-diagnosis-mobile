@@ -8,12 +8,47 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { User } from "lucide-react-native";
+import { Calendar as CalendarIcon, User } from "lucide-react-native";
+import { Calendar } from "react-native-calendars";
 import { getProfile, updateProfile } from "@/utils/backendApi";
+import { useAppTheme } from "@/utils/theme";
+
+function formatDateForCalendar(value) {
+  if (!value) {
+    return "";
+  }
+
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  const year = parsedDate.getFullYear();
+  const month = String(parsedDate.getMonth() + 1).padStart(2, "0");
+  const day = String(parsedDate.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateForDisplay(value) {
+  if (!value) {
+    return "";
+  }
+
+  const [year, month, day] = value.split("-");
+
+  if (!year || !month || !day) {
+    return value;
+  }
+
+  return `${day}.${month}.${year}`;
+}
 
 export default function PersonalInfo() {
   const [formData, setFormData] = useState({
@@ -27,8 +62,10 @@ export default function PersonalInfo() {
   });
   const [loading, setLoading] = useState(false);
   const [loadingProfile, setLoadingProfile] = useState(true);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors, statusBarStyle, resolvedTheme } = useAppTheme();
 
   useEffect(() => {
     let isMounted = true;
@@ -44,7 +81,7 @@ export default function PersonalInfo() {
         setFormData({
           firstName: profile.firstName,
           lastName: profile.lastName,
-          dateOfBirth: profile.dateOfBirth,
+          dateOfBirth: formatDateForCalendar(profile.dateOfBirth),
           gender: profile.gender,
           address: profile.address,
           emergencyContact: profile.emergencyContact,
@@ -112,12 +149,12 @@ export default function PersonalInfo() {
       <View
         style={{
           flex: 1,
-          backgroundColor: "#ffffff",
+          backgroundColor: colors.background,
           justifyContent: "center",
           alignItems: "center",
         }}
       >
-        <Text style={{ fontSize: 16, color: "#6b7280" }}>
+        <Text style={{ fontSize: 16, color: colors.mutedText }}>
           Loading profile...
         </Text>
       </View>
@@ -126,10 +163,10 @@ export default function PersonalInfo() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#ffffff" }}
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -144,20 +181,20 @@ export default function PersonalInfo() {
             style={{
               width: 80,
               height: 80,
-              backgroundColor: "#fef3c7",
+              backgroundColor: colors.warningSoft,
               borderRadius: 40,
               justifyContent: "center",
               alignItems: "center",
               marginBottom: 24,
             }}
           >
-            <User size={32} color="#d97706" />
+            <User size={32} color={colors.warning} />
           </View>
           <Text
             style={{
               fontSize: 28,
               fontWeight: "700",
-              color: "#111827",
+              color: colors.text,
               textAlign: "center",
               marginBottom: 8,
             }}
@@ -167,7 +204,7 @@ export default function PersonalInfo() {
           <Text
             style={{
               fontSize: 16,
-              color: "#6b7280",
+              color: colors.mutedText,
               textAlign: "center",
               lineHeight: 24,
             }}
@@ -183,7 +220,7 @@ export default function PersonalInfo() {
                 style={{
                   fontSize: 14,
                   fontWeight: "600",
-                  color: "#374151",
+                  color: colors.text,
                   marginBottom: 8,
                 }}
               >
@@ -191,17 +228,17 @@ export default function PersonalInfo() {
               </Text>
               <TextInput
                 style={{
-                  backgroundColor: "#f9fafb",
+                  backgroundColor: colors.softSurface,
                   borderWidth: 1,
-                  borderColor: "#e5e7eb",
+                  borderColor: colors.border,
                   borderRadius: 12,
                   paddingHorizontal: 16,
                   paddingVertical: 14,
                   fontSize: 16,
-                  color: "#111827",
+                  color: colors.text,
                 }}
                 placeholder="John"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.subtleText}
                 value={formData.firstName}
                 onChangeText={(value) => handleInputChange("firstName", value)}
               />
@@ -211,7 +248,7 @@ export default function PersonalInfo() {
                 style={{
                   fontSize: 14,
                   fontWeight: "600",
-                  color: "#374151",
+                  color: colors.text,
                   marginBottom: 8,
                 }}
               >
@@ -219,17 +256,17 @@ export default function PersonalInfo() {
               </Text>
               <TextInput
                 style={{
-                  backgroundColor: "#f9fafb",
+                  backgroundColor: colors.softSurface,
                   borderWidth: 1,
-                  borderColor: "#e5e7eb",
+                  borderColor: colors.border,
                   borderRadius: 12,
                   paddingHorizontal: 16,
                   paddingVertical: 14,
                   fontSize: 16,
-                  color: "#111827",
+                  color: colors.text,
                 }}
                 placeholder="Doe"
-                placeholderTextColor="#9ca3af"
+                placeholderTextColor={colors.subtleText}
                 value={formData.lastName}
                 onChangeText={(value) => handleInputChange("lastName", value)}
               />
@@ -241,28 +278,38 @@ export default function PersonalInfo() {
               style={{
                 fontSize: 14,
                 fontWeight: "600",
-                color: "#374151",
+                color: colors.text,
                 marginBottom: 8,
               }}
             >
               Date of Birth
             </Text>
-            <TextInput
+            <TouchableOpacity
               style={{
-                backgroundColor: "#f9fafb",
+                backgroundColor: colors.softSurface,
                 borderWidth: 1,
-                borderColor: "#e5e7eb",
+                borderColor: colors.border,
                 borderRadius: 12,
                 paddingHorizontal: 16,
                 paddingVertical: 14,
-                fontSize: 16,
-                color: "#111827",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
-              placeholder="MM/DD/YYYY"
-              placeholderTextColor="#9ca3af"
-              value={formData.dateOfBirth}
-              onChangeText={(value) => handleInputChange("dateOfBirth", value)}
-            />
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text
+                style={{
+                  fontSize: 16,
+                  color: formData.dateOfBirth ? colors.text : colors.subtleText,
+                }}
+              >
+                {formData.dateOfBirth
+                  ? formatDateForDisplay(formData.dateOfBirth)
+                  : "Select your date of birth"}
+              </Text>
+              <CalendarIcon size={18} color={colors.mutedText} />
+            </TouchableOpacity>
           </View>
 
           <View style={{ marginBottom: 20 }}>
@@ -270,7 +317,7 @@ export default function PersonalInfo() {
               style={{
                 fontSize: 14,
                 fontWeight: "600",
-                color: "#374151",
+                color: colors.text,
                 marginBottom: 8,
               }}
             >
@@ -283,10 +330,12 @@ export default function PersonalInfo() {
                   style={{
                     flex: 1,
                     backgroundColor:
-                      formData.gender === gender ? "#eff6ff" : "#f9fafb",
+                      formData.gender === gender
+                        ? colors.primarySoft
+                        : colors.softSurface,
                     borderWidth: 1,
                     borderColor:
-                      formData.gender === gender ? "#2563eb" : "#e5e7eb",
+                      formData.gender === gender ? colors.primary : colors.border,
                     borderRadius: 12,
                     paddingVertical: 14,
                     alignItems: "center",
@@ -297,7 +346,10 @@ export default function PersonalInfo() {
                     style={{
                       fontSize: 16,
                       fontWeight: "500",
-                      color: formData.gender === gender ? "#2563eb" : "#6b7280",
+                      color:
+                        formData.gender === gender
+                          ? colors.primary
+                          : colors.mutedText,
                     }}
                   >
                     {gender}
@@ -312,7 +364,7 @@ export default function PersonalInfo() {
               style={{
                 fontSize: 14,
                 fontWeight: "600",
-                color: "#374151",
+                color: colors.text,
                 marginBottom: 8,
               }}
             >
@@ -320,17 +372,17 @@ export default function PersonalInfo() {
             </Text>
             <TextInput
               style={{
-                backgroundColor: "#f9fafb",
+                backgroundColor: colors.softSurface,
                 borderWidth: 1,
-                borderColor: "#e5e7eb",
+                borderColor: colors.border,
                 borderRadius: 12,
                 paddingHorizontal: 16,
                 paddingVertical: 14,
                 fontSize: 16,
-                color: "#111827",
+                color: colors.text,
               }}
               placeholder="Enter your address"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.subtleText}
               value={formData.address}
               onChangeText={(value) => handleInputChange("address", value)}
               multiline
@@ -342,7 +394,7 @@ export default function PersonalInfo() {
               style={{
                 fontSize: 14,
                 fontWeight: "600",
-                color: "#374151",
+                color: colors.text,
                 marginBottom: 8,
               }}
             >
@@ -350,17 +402,17 @@ export default function PersonalInfo() {
             </Text>
             <TextInput
               style={{
-                backgroundColor: "#f9fafb",
+                backgroundColor: colors.softSurface,
                 borderWidth: 1,
-                borderColor: "#e5e7eb",
+                borderColor: colors.border,
                 borderRadius: 12,
                 paddingHorizontal: 16,
                 paddingVertical: 14,
                 fontSize: 16,
-                color: "#111827",
+                color: colors.text,
               }}
               placeholder="Emergency contact number"
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.subtleText}
               value={formData.emergencyContact}
               onChangeText={(value) =>
                 handleInputChange("emergencyContact", value)
@@ -374,7 +426,7 @@ export default function PersonalInfo() {
               style={{
                 fontSize: 14,
                 fontWeight: "600",
-                color: "#374151",
+                color: colors.text,
                 marginBottom: 8,
               }}
             >
@@ -382,19 +434,19 @@ export default function PersonalInfo() {
             </Text>
             <TextInput
               style={{
-                backgroundColor: "#f9fafb",
+                backgroundColor: colors.softSurface,
                 borderWidth: 1,
-                borderColor: "#e5e7eb",
+                borderColor: colors.border,
                 borderRadius: 12,
                 paddingHorizontal: 16,
                 paddingVertical: 14,
                 fontSize: 16,
-                color: "#111827",
+                color: colors.text,
                 height: 100,
                 textAlignVertical: "top",
               }}
               placeholder="Any relevant medical history, allergies, or conditions..."
-              placeholderTextColor="#9ca3af"
+              placeholderTextColor={colors.subtleText}
               value={formData.medicalHistory}
               onChangeText={(value) =>
                 handleInputChange("medicalHistory", value)
@@ -404,12 +456,12 @@ export default function PersonalInfo() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={{
-            backgroundColor: loading ? "#9ca3af" : "#2563eb",
-            borderRadius: 12,
-            paddingVertical: 16,
-            alignItems: "center",
+          <TouchableOpacity
+            style={{
+            backgroundColor: loading ? colors.subtleText : colors.primary,
+              borderRadius: 12,
+              paddingVertical: 16,
+              alignItems: "center",
             marginBottom: 24,
           }}
           onPress={handleSubmit}
@@ -426,6 +478,126 @@ export default function PersonalInfo() {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor:
+              resolvedTheme === "dark"
+                ? "rgba(2, 6, 23, 0.72)"
+                : "rgba(17, 24, 39, 0.4)",
+            justifyContent: "center",
+            paddingHorizontal: 24,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 20,
+              padding: 20,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "700",
+                color: colors.text,
+                marginBottom: 16,
+              }}
+            >
+              Select Date of Birth
+            </Text>
+
+            <Calendar
+              current={formData.dateOfBirth || undefined}
+              maxDate={new Date().toISOString().split("T")[0]}
+              markedDates={
+                formData.dateOfBirth
+                  ? {
+                      [formData.dateOfBirth]: {
+                        selected: true,
+                        selectedColor: colors.primary,
+                      },
+                    }
+                  : undefined
+              }
+              onDayPress={({ dateString }) => {
+                handleInputChange("dateOfBirth", dateString);
+                setShowDatePicker(false);
+              }}
+              theme={{
+                todayTextColor: colors.primary,
+                arrowColor: colors.primary,
+                selectedDayBackgroundColor: colors.primary,
+                selectedDayTextColor: "#ffffff",
+                textDayFontSize: 16,
+                textMonthFontSize: 16,
+                textDayHeaderFontSize: 14,
+                calendarBackground: colors.surface,
+                monthTextColor: colors.text,
+                dayTextColor: colors.text,
+                textDisabledColor: colors.subtleText,
+              }}
+            />
+
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "flex-end",
+                gap: 12,
+                marginTop: 16,
+              }}
+            >
+              <TouchableOpacity
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 10,
+                }}
+                onPress={() => setShowDatePicker(false)}
+              >
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: "600",
+                    color: colors.mutedText,
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              {formData.dateOfBirth ? (
+                <TouchableOpacity
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                  }}
+                  onPress={() => {
+                    handleInputChange("dateOfBirth", "");
+                    setShowDatePicker(false);
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "600",
+                      color: colors.danger,
+                    }}
+                  >
+                    Clear
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

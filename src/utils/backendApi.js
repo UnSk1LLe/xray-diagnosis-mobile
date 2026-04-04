@@ -4,6 +4,40 @@ const apiBaseUrl = rawBaseUrl.replace(/\/+$/, "");
 
 let refreshPromise = null;
 
+function getFileNameFromUri(uri) {
+  if (typeof uri !== "string" || !uri) {
+    return "xray.jpg";
+  }
+
+  const sanitizedUri = uri.split("?")[0];
+  const segments = sanitizedUri.split("/");
+  const fileName = segments[segments.length - 1];
+
+  return fileName || "xray.jpg";
+}
+
+function getMimeTypeFromAsset(imageAsset) {
+  if (imageAsset?.mimeType) {
+    return imageAsset.mimeType;
+  }
+
+  const fileName = imageAsset?.fileName || getFileNameFromUri(imageAsset?.uri);
+  const extension = fileName.split(".").pop()?.toLowerCase();
+
+  switch (extension) {
+    case "png":
+      return "image/png";
+    case "webp":
+      return "image/webp";
+    case "heic":
+      return "image/heic";
+    case "heif":
+      return "image/heif";
+    default:
+      return "image/jpeg";
+  }
+}
+
 function buildUrl(path) {
   if (!path.startsWith("/")) {
     return `${apiBaseUrl}/${path}`;
@@ -56,12 +90,26 @@ export async function apiRequest(path, options = {}, extra = {}) {
     headers["Content-Type"] = "application/json";
   }
 
+  console.log("[apiRequest] start", {
+    path,
+    method: options.method || "GET",
+    isFormData,
+    retryOnUnauthorized,
+  });
+
   const response = await fetch(buildUrl(path), {
     ...options,
     headers,
     credentials: "include",
   });
   const payload = await parseResponse(response);
+
+  console.log("[apiRequest] response", {
+    path,
+    status: response.status,
+    ok: response.ok,
+    hasPayload: payload != null,
+  });
 
   if (
     response.status === 401 &&
@@ -255,11 +303,27 @@ export async function deleteReport(reportID) {
 }
 
 export async function createReport(imageAsset) {
+  if (!imageAsset?.uri) {
+    throw new Error("Selected image is missing a valid file URI.");
+  }
+
+  const fileName = imageAsset.fileName || getFileNameFromUri(imageAsset.uri);
+  const mimeType = getMimeTypeFromAsset(imageAsset);
+
+  console.log("[createReport] start", {
+    uri: imageAsset.uri,
+    width: imageAsset.width ?? null,
+    height: imageAsset.height ?? null,
+    fileName,
+    fileSize: imageAsset.fileSize ?? null,
+    mimeType,
+  });
+
   const formData = new FormData();
   formData.append("image", {
     uri: imageAsset.uri,
-    name: imageAsset.fileName || "xray.jpg",
-    type: imageAsset.mimeType || "image/jpeg",
+    name: fileName,
+    type: mimeType,
   });
   formData.append("report_type", "chest_xray");
 

@@ -4,31 +4,32 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
-import { FileText, Calendar, Activity, Download } from "lucide-react-native";
-import { Image } from "expo-image";
+import { FileText, Calendar, Activity, Download, Trash2 } from "lucide-react-native";
 import { deleteReport, listReports } from "@/utils/backendApi";
+import SafeImage from "@/components/SafeImage";
+import { useAppTheme } from "@/utils/theme";
 
-function getStatusColors(status) {
+function getStatusColors(status, colors) {
   if (status === "Normal") {
     return {
-      icon: "#16a34a",
-      text: "#16a34a",
-      background: "#dcfce7",
+      icon: colors.success,
+      text: colors.success,
+      background: colors.successSoft,
     };
   }
 
   if (status === "Processing") {
     return {
-      icon: "#2563eb",
-      text: "#2563eb",
-      background: "#dbeafe",
+      icon: colors.primary,
+      text: colors.primary,
+      background: colors.primarySoft,
     };
   }
 
   return {
-    icon: "#d97706",
-    text: "#d97706",
-    background: "#fef3c7",
+    icon: colors.warning,
+    text: colors.warning,
+    background: colors.warningSoft,
   };
 }
 
@@ -38,6 +39,7 @@ export default function ReportsScreen() {
   const [filterStatus, setFilterStatus] = useState("All");
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors, statusBarStyle } = useAppTheme();
 
   const filterReports = useCallback((items, activeStatus) => {
     if (activeStatus === "All") {
@@ -90,7 +92,16 @@ export default function ReportsScreen() {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) {
+      return "Unknown date";
+    }
+
     const date = new Date(dateString);
+
+    if (Number.isNaN(date.getTime())) {
+      return dateString;
+    }
+
     return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
@@ -135,8 +146,8 @@ export default function ReportsScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
-      <StatusBar style="dark" />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={statusBarStyle} />
       <View
         style={{
           flex: 1,
@@ -150,7 +161,7 @@ export default function ReportsScreen() {
             style={{
               fontSize: 28,
               fontWeight: "700",
-              color: "#111827",
+              color: colors.text,
               marginBottom: 8,
             }}
           >
@@ -159,7 +170,7 @@ export default function ReportsScreen() {
           <Text
             style={{
               fontSize: 16,
-              color: "#6b7280",
+              color: colors.mutedText,
               lineHeight: 24,
             }}
           >
@@ -170,7 +181,7 @@ export default function ReportsScreen() {
         <View
           style={{
             flexDirection: "row",
-            backgroundColor: "#f3f4f6",
+            backgroundColor: colors.elevatedSurface,
             borderRadius: 12,
             padding: 4,
             marginBottom: 24,
@@ -182,7 +193,7 @@ export default function ReportsScreen() {
               style={{
                 flex: 1,
                 backgroundColor:
-                  filterStatus === status ? "#ffffff" : "transparent",
+                  filterStatus === status ? colors.surface : "transparent",
                 borderRadius: 8,
                 paddingVertical: 8,
                 alignItems: "center",
@@ -193,7 +204,7 @@ export default function ReportsScreen() {
                 style={{
                   fontSize: 14,
                   fontWeight: "600",
-                  color: filterStatus === status ? "#111827" : "#6b7280",
+                  color: filterStatus === status ? colors.text : colors.mutedText,
                 }}
               >
                 {status}
@@ -206,22 +217,22 @@ export default function ReportsScreen() {
           {filteredReports.length === 0 ? (
             <View
               style={{
-                backgroundColor: "#f9fafb",
+                backgroundColor: colors.softSurface,
                 borderRadius: 16,
                 padding: 32,
                 alignItems: "center",
                 borderWidth: 1,
-                borderColor: "#e5e7eb",
+                borderColor: colors.border,
                 borderStyle: "dashed",
                 marginTop: 40,
               }}
             >
-              <FileText size={48} color="#9ca3af" />
+              <FileText size={48} color={colors.subtleText} />
               <Text
                 style={{
                   fontSize: 16,
                   fontWeight: "500",
-                  color: "#6b7280",
+                  color: colors.mutedText,
                   marginTop: 12,
                   marginBottom: 8,
                 }}
@@ -233,7 +244,7 @@ export default function ReportsScreen() {
               <Text
                 style={{
                   fontSize: 14,
-                  color: "#9ca3af",
+                  color: colors.subtleText,
                   textAlign: "center",
                 }}
               >
@@ -245,17 +256,17 @@ export default function ReportsScreen() {
           ) : (
             <View style={{ gap: 16 }}>
               {filteredReports.map((report) => {
-                const statusColors = getStatusColors(report.status);
+                const statusColors = getStatusColors(report.status, colors);
 
                 return (
                   <TouchableOpacity
                     key={report.id}
                     style={{
-                      backgroundColor: "#ffffff",
+                      backgroundColor: colors.surface,
                       borderRadius: 16,
                       padding: 16,
                       borderWidth: 1,
-                      borderColor: "#e5e7eb",
+                      borderColor: colors.border,
                       shadowColor: "#000",
                       shadowOffset: { width: 0, height: 1 },
                       shadowOpacity: 0.05,
@@ -274,17 +285,17 @@ export default function ReportsScreen() {
                         style={{
                           width: 60,
                           height: 60,
-                          backgroundColor: "#f3f4f6",
+                          backgroundColor: colors.elevatedSurface,
                           borderRadius: 8,
                           marginRight: 12,
                           overflow: "hidden",
                         }}
                       >
                         {report.imageUrl ? (
-                          <Image
-                            source={{ uri: report.imageUrl }}
+                          <SafeImage
+                            uri={report.imageUrl}
                             style={{ width: "100%", height: "100%" }}
-                            contentFit="cover"
+                            borderRadius={8}
                           />
                         ) : (
                           <View
@@ -294,7 +305,7 @@ export default function ReportsScreen() {
                               alignItems: "center",
                             }}
                           >
-                            <FileText size={24} color="#9ca3af" />
+                            <FileText size={24} color={colors.subtleText} />
                           </View>
                         )}
                       </View>
@@ -304,7 +315,7 @@ export default function ReportsScreen() {
                           style={{
                             fontSize: 16,
                             fontWeight: "600",
-                            color: "#111827",
+                            color: colors.text,
                             marginBottom: 4,
                           }}
                         >
@@ -318,11 +329,11 @@ export default function ReportsScreen() {
                             marginBottom: 8,
                           }}
                         >
-                          <Calendar size={14} color="#6b7280" />
+                          <Calendar size={14} color={colors.mutedText} />
                           <Text
                             style={{
                               fontSize: 14,
-                              color: "#6b7280",
+                              color: colors.mutedText,
                             }}
                           >
                             {formatDate(report.date)}
@@ -358,7 +369,7 @@ export default function ReportsScreen() {
                             <Text
                               style={{
                                 fontSize: 12,
-                                color: "#6b7280",
+                                color: colors.mutedText,
                               }}
                             >
                               {report.confidence}% confidence
@@ -378,29 +389,26 @@ export default function ReportsScreen() {
                             width: 32,
                             height: 32,
                             borderRadius: 16,
-                            backgroundColor: "#f3f4f6",
+                            backgroundColor: colors.elevatedSurface,
                             justifyContent: "center",
                             alignItems: "center",
                           }}
                           onPress={exportReport}
                         >
-                          <Download size={16} color="#6b7280" />
+                          <Download size={16} color={colors.mutedText} />
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
+                            width: 32,
+                            height: 32,
+                            borderRadius: 16,
+                            backgroundColor: colors.elevatedSurface,
+                            justifyContent: "center",
+                            alignItems: "center",
                           }}
                           onPress={() => removeReport(report.id)}
                         >
-                          <Text
-                            style={{
-                              fontSize: 12,
-                              color: "#dc2626",
-                            }}
-                          >
-                            Delete
-                          </Text>
+                          <Trash2 size={16} color={colors.danger} />
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -408,7 +416,7 @@ export default function ReportsScreen() {
                     {report.findings.length > 0 ? (
                       <View
                         style={{
-                          backgroundColor: "#f8fafc",
+                          backgroundColor: colors.mutedSurface,
                           borderRadius: 8,
                           padding: 12,
                           marginTop: 8,
@@ -417,7 +425,7 @@ export default function ReportsScreen() {
                         <Text
                           style={{
                             fontSize: 14,
-                            color: "#374151",
+                            color: colors.text,
                             lineHeight: 20,
                           }}
                         >
@@ -428,7 +436,7 @@ export default function ReportsScreen() {
                     ) : report.status === "Processing" ? (
                       <View
                         style={{
-                          backgroundColor: "#eff6ff",
+                          backgroundColor: colors.primarySoft,
                           borderRadius: 8,
                           padding: 12,
                           marginTop: 8,
@@ -437,7 +445,7 @@ export default function ReportsScreen() {
                         <Text
                           style={{
                             fontSize: 14,
-                            color: "#1d4ed8",
+                            color: colors.primary,
                             lineHeight: 20,
                           }}
                         >

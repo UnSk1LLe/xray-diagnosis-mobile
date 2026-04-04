@@ -1,21 +1,24 @@
 import { Tabs } from "expo-router";
 import { Home, Camera, FileText, User } from "lucide-react-native";
+import { useAppTheme } from "@/utils/theme";
 
 export default function TabLayout() {
+  const { colors } = useAppTheme();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: "#ffffff",
+          backgroundColor: colors.tabBar,
           borderTopWidth: 1,
-          borderTopColor: "#e5e7eb",
+          borderTopColor: colors.border,
           paddingTop: 8,
           paddingBottom: 8,
           height: 88,
         },
-        tabBarActiveTintColor: "#2563eb",
-        tabBarInactiveTintColor: "#6b7280",
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.mutedText,
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: "500",

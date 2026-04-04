@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Image as RNImage,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -16,19 +17,114 @@ import {
   FileText,
 } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
-import { Image } from "expo-image";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { createReport } from "@/utils/backendApi";
+import { useAppTheme } from "@/utils/theme";
+
+const MAX_IMAGE_DIMENSION = 1600;
+
+function summarizeAsset(asset) {
+  if (!asset) {
+    return null;
+  }
+
+  return {
+    uri: asset.uri,
+    width: asset.width,
+    height: asset.height,
+    fileName: asset.fileName ?? null,
+    fileSize: asset.fileSize ?? null,
+    mimeType: asset.mimeType ?? null,
+    type: asset.type ?? null,
+    assetId: asset.assetId ?? null,
+  };
+}
 
 export default function ScanScreen() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [preparingImage, setPreparingImage] = useState(false);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors, statusBarStyle } = useAppTheme();
+
+  const optimizeImageAsset = async (asset) => {
+    console.log("[scan] optimizeImageAsset:start", summarizeAsset(asset));
+
+    if (!asset?.uri || !asset.width || !asset.height) {
+      console.log("[scan] optimizeImageAsset:skip-missing-dimensions");
+      return asset;
+    }
+
+    const longestSide = Math.max(asset.width, asset.height);
+    console.log("[scan] optimizeImageAsset:dimensions", {
+      width: asset.width,
+      height: asset.height,
+      longestSide,
+    });
+
+    if (longestSide <= MAX_IMAGE_DIMENSION) {
+      console.log("[scan] optimizeImageAsset:skip-resize", {
+        maxDimension: MAX_IMAGE_DIMENSION,
+      });
+      return asset;
+    }
+
+    const scale = MAX_IMAGE_DIMENSION / longestSide;
+    const width = Math.round(asset.width * scale);
+    const height = Math.round(asset.height * scale);
+    const optimizedImage = await manipulateAsync(
+      asset.uri,
+      [{ resize: { width, height } }],
+      {
+        compress: 0.7,
+        format: SaveFormat.JPEG,
+      },
+    );
+
+    console.log("[scan] optimizeImageAsset:done", {
+      originalWidth: asset.width,
+      originalHeight: asset.height,
+      width: optimizedImage.width,
+      height: optimizedImage.height,
+      uri: optimizedImage.uri,
+    });
+
+    return {
+      ...asset,
+      uri: optimizedImage.uri,
+      width: optimizedImage.width,
+      height: optimizedImage.height,
+      fileName: asset.fileName || "xray.jpg",
+      mimeType: "image/jpeg",
+    };
+  };
+
+  const handleSelectedAsset = async (asset) => {
+    console.log("[scan] handleSelectedAsset:start", summarizeAsset(asset));
+    setPreparingImage(true);
+
+    try {
+      const optimizedAsset = await optimizeImageAsset(asset);
+      console.log(
+        "[scan] handleSelectedAsset:setSelectedImage",
+        summarizeAsset(optimizedAsset),
+      );
+      setSelectedImage(optimizedAsset);
+    } catch (error) {
+      console.error("Image optimization error:", error);
+      Alert.alert("Error", "Failed to prepare the selected image");
+    } finally {
+      setPreparingImage(false);
+    }
+  };
 
   const pickImageFromLibrary = async () => {
     try {
+      console.log("[scan] pickImageFromLibrary:request-permission");
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log("[scan] pickImageFromLibrary:permission", { status });
       if (status !== "granted") {
         Alert.alert(
           "Permission Required",
@@ -37,24 +133,33 @@ export default function ScanScreen() {
         return;
       }
 
+      console.log("[scan] pickImageFromLibrary:launch");
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
+      console.log("[scan] pickImageFromLibrary:result", {
+        canceled: result.canceled,
+        assetsCount: result.assets?.length ?? 0,
+        firstAsset: summarizeAsset(result.assets?.[0]),
+      });
 
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0]);
+      if (!result.canceled && result.assets?.[0]) {
+        await handleSelectedAsset(result.assets[0]);
       }
-    } catch {
+    } catch (error) {
+      console.error("[scan] pickImageFromLibrary:error", error);
       Alert.alert("Error", "Failed to pick image from library");
     }
   };
 
   const takePhoto = async () => {
     try {
+      console.log("[scan] takePhoto:request-permission");
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      console.log("[scan] takePhoto:permission", { status });
       if (status !== "granted") {
         Alert.alert(
           "Permission Required",
@@ -63,22 +168,30 @@ export default function ScanScreen() {
         return;
       }
 
+      console.log("[scan] takePhoto:launch");
       const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
       });
+      console.log("[scan] takePhoto:result", {
+        canceled: result.canceled,
+        assetsCount: result.assets?.length ?? 0,
+        firstAsset: summarizeAsset(result.assets?.[0]),
+      });
 
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0]);
+      if (!result.canceled && result.assets?.[0]) {
+        await handleSelectedAsset(result.assets[0]);
       }
-    } catch {
+    } catch (error) {
+      console.error("[scan] takePhoto:error", error);
       Alert.alert("Error", "Failed to take photo");
     }
   };
 
   const analyzeXRay = async () => {
-    if (!selectedImage) {
+    if (!selectedImage || preparingImage) {
       Alert.alert("Error", "Please select an image first");
       return;
     }
@@ -86,14 +199,16 @@ export default function ScanScreen() {
     setAnalyzing(true);
 
     try {
+      console.log("[scan] analyzeXRay:start", summarizeAsset(selectedImage));
       const response = await createReport(selectedImage);
+      console.log("[scan] analyzeXRay:success", response);
 
       router.push({
         pathname: "/report-result",
         params: { reportId: String(response.reportId) },
       });
     } catch (error) {
-      console.error("Analysis error:", error);
+      console.error("[scan] analyzeXRay:error", error);
       Alert.alert(
         "Error",
         error instanceof Error
@@ -110,8 +225,8 @@ export default function ScanScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
-      <StatusBar style="dark" />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={statusBarStyle} />
       <View
         style={{
           flex: 1,
@@ -125,7 +240,7 @@ export default function ScanScreen() {
             style={{
               fontSize: 28,
               fontWeight: "700",
-              color: "#111827",
+              color: colors.text,
               marginBottom: 8,
             }}
           >
@@ -134,7 +249,7 @@ export default function ScanScreen() {
           <Text
             style={{
               fontSize: 16,
-              color: "#6b7280",
+              color: colors.mutedText,
               lineHeight: 24,
             }}
           >
@@ -146,28 +261,41 @@ export default function ScanScreen() {
           <View style={{ marginBottom: 32 }}>
             <View
               style={{
-                backgroundColor: "#f8fafc",
+                backgroundColor: colors.mutedSurface,
                 borderRadius: 16,
                 padding: 16,
                 borderWidth: 1,
-                borderColor: "#e2e8f0",
+                borderColor: colors.subtleBorder,
               }}
             >
-              <Image
+              <RNImage
                 source={{ uri: selectedImage.uri }}
                 style={{
                   width: "100%",
                   height: 200,
                   borderRadius: 12,
                 }}
-                contentFit="cover"
+                resizeMode="cover"
+                onLoadStart={() => {
+                  console.log("[scan] preview:onLoadStart", {
+                    uri: selectedImage.uri,
+                  });
+                }}
+                onLoad={() => {
+                  console.log("[scan] preview:onLoad", {
+                    uri: selectedImage.uri,
+                  });
+                }}
+                onError={(event) => {
+                  console.error("[scan] preview:onError", event.nativeEvent);
+                }}
               />
               <TouchableOpacity
                 style={{
                   position: "absolute",
                   top: 24,
                   right: 24,
-                  backgroundColor: "#ffffff",
+                  backgroundColor: colors.surface,
                   borderRadius: 20,
                   width: 40,
                   height: 40,
@@ -181,7 +309,7 @@ export default function ScanScreen() {
                 }}
                 onPress={resetSelection}
               >
-                <Text style={{ fontSize: 18, color: "#6b7280" }}>X</Text>
+                <Text style={{ fontSize: 18, color: colors.mutedText }}>X</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -189,22 +317,22 @@ export default function ScanScreen() {
           <View style={{ flex: 1, justifyContent: "center", marginBottom: 32 }}>
             <View
               style={{
-                backgroundColor: "#f9fafb",
+                backgroundColor: colors.softSurface,
                 borderRadius: 16,
                 padding: 32,
                 alignItems: "center",
                 borderWidth: 2,
-                borderColor: "#e5e7eb",
+                borderColor: colors.border,
                 borderStyle: "dashed",
                 marginBottom: 24,
               }}
             >
-              <ImageIcon size={64} color="#9ca3af" />
+              <ImageIcon size={64} color={colors.subtleText} />
               <Text
                 style={{
                   fontSize: 18,
                   fontWeight: "600",
-                  color: "#374151",
+                  color: colors.text,
                   marginTop: 16,
                   marginBottom: 8,
                 }}
@@ -214,7 +342,7 @@ export default function ScanScreen() {
               <Text
                 style={{
                   fontSize: 14,
-                  color: "#6b7280",
+                  color: colors.mutedText,
                   textAlign: "center",
                   lineHeight: 20,
                 }}
@@ -226,7 +354,7 @@ export default function ScanScreen() {
             <View style={{ gap: 12 }}>
               <TouchableOpacity
                 style={{
-                  backgroundColor: "#2563eb",
+                  backgroundColor: colors.primary,
                   borderRadius: 12,
                   paddingVertical: 16,
                   flexDirection: "row",
@@ -235,24 +363,31 @@ export default function ScanScreen() {
                   gap: 12,
                 }}
                 onPress={takePhoto}
+                disabled={preparingImage}
               >
-                <Camera size={20} color="#ffffff" />
-                <Text
-                  style={{
-                    color: "#ffffff",
-                    fontSize: 16,
-                    fontWeight: "600",
-                  }}
-                >
-                  Take Photo
-                </Text>
+                {preparingImage ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Camera size={20} color="#ffffff" />
+                    <Text
+                      style={{
+                        color: "#ffffff",
+                        fontSize: 16,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Take Photo
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={{
-                  backgroundColor: "#ffffff",
+                  backgroundColor: colors.surface,
                   borderWidth: 2,
-                  borderColor: "#2563eb",
+                  borderColor: colors.primary,
                   borderRadius: 12,
                   paddingVertical: 16,
                   flexDirection: "row",
@@ -261,17 +396,24 @@ export default function ScanScreen() {
                   gap: 12,
                 }}
                 onPress={pickImageFromLibrary}
+                disabled={preparingImage}
               >
-                <Upload size={20} color="#2563eb" />
-                <Text
-                  style={{
-                    color: "#2563eb",
-                    fontSize: 16,
-                    fontWeight: "600",
-                  }}
-                >
-                  Choose from Gallery
-                </Text>
+                {preparingImage ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <>
+                    <Upload size={20} color={colors.primary} />
+                    <Text
+                      style={{
+                        color: colors.primary,
+                        fontSize: 16,
+                        fontWeight: "600",
+                      }}
+                    >
+                      Choose from Gallery
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -281,7 +423,7 @@ export default function ScanScreen() {
           <View style={{ marginTop: "auto" }}>
             <TouchableOpacity
               style={{
-                backgroundColor: analyzing ? "#9ca3af" : "#16a34a",
+                backgroundColor: analyzing ? colors.subtleText : colors.success,
                 borderRadius: 12,
                 paddingVertical: 16,
                 flexDirection: "row",
@@ -290,9 +432,9 @@ export default function ScanScreen() {
                 gap: 12,
               }}
               onPress={analyzeXRay}
-              disabled={analyzing}
+              disabled={analyzing || preparingImage}
             >
-              {analyzing ? (
+              {analyzing || preparingImage ? (
                 <>
                   <ActivityIndicator size="small" color="#ffffff" />
                   <Text
@@ -302,7 +444,9 @@ export default function ScanScreen() {
                       fontWeight: "600",
                     }}
                   >
-                    Uploading and queueing report...
+                    {preparingImage
+                      ? "Preparing image..."
+                      : "Uploading and queueing report..."}
                   </Text>
                 </>
               ) : (
@@ -324,7 +468,7 @@ export default function ScanScreen() {
             <Text
               style={{
                 fontSize: 12,
-                color: "#6b7280",
+                color: colors.mutedText,
                 textAlign: "center",
                 marginTop: 12,
                 lineHeight: 16,

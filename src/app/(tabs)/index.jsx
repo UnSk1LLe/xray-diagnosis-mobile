@@ -6,12 +6,14 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { Camera, FileText, Activity, Clock, Plus } from "lucide-react-native";
 import { getProfile, listReports } from "@/utils/backendApi";
+import { useAppTheme } from "@/utils/theme";
 
 export default function HomeScreen() {
   const [profile, setProfile] = useState(null);
   const [reports, setReports] = useState([]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors, statusBarStyle } = useAppTheme();
 
   useFocusEffect(
     useCallback(() => {
@@ -63,8 +65,8 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
-      <StatusBar style="dark" />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={statusBarStyle} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -79,7 +81,7 @@ export default function HomeScreen() {
             style={{
               fontSize: 32,
               fontWeight: "700",
-              color: "#111827",
+              color: colors.text,
               marginBottom: 8,
             }}
           >
@@ -88,7 +90,7 @@ export default function HomeScreen() {
           <Text
             style={{
               fontSize: 16,
-              color: "#6b7280",
+              color: colors.mutedText,
               lineHeight: 24,
             }}
           >
@@ -101,7 +103,7 @@ export default function HomeScreen() {
             style={{
               fontSize: 20,
               fontWeight: "600",
-              color: "#111827",
+              color: colors.text,
               marginBottom: 16,
             }}
           >
@@ -185,7 +187,7 @@ export default function HomeScreen() {
             style={{
               fontSize: 20,
               fontWeight: "600",
-              color: "#111827",
+              color: colors.text,
               marginBottom: 16,
             }}
           >
@@ -193,11 +195,11 @@ export default function HomeScreen() {
           </Text>
           <View
             style={{
-              backgroundColor: "#f8fafc",
+              backgroundColor: colors.mutedSurface,
               borderRadius: 16,
               padding: 20,
               borderWidth: 1,
-              borderColor: "#e2e8f0",
+              borderColor: colors.subtleBorder,
             }}
           >
             <View
@@ -220,7 +222,7 @@ export default function HomeScreen() {
                 <Text
                   style={{
                     fontSize: 14,
-                    color: "#6b7280",
+                    color: colors.mutedText,
                   }}
                 >
                   Total Scans
@@ -239,7 +241,7 @@ export default function HomeScreen() {
                 <Text
                   style={{
                     fontSize: 14,
-                    color: "#6b7280",
+                    color: colors.mutedText,
                   }}
                 >
                   Normal Results
@@ -258,7 +260,7 @@ export default function HomeScreen() {
                 <Text
                   style={{
                     fontSize: 14,
-                    color: "#6b7280",
+                    color: colors.mutedText,
                   }}
                 >
                   Needs Review
@@ -281,7 +283,7 @@ export default function HomeScreen() {
               style={{
                 fontSize: 20,
                 fontWeight: "600",
-                color: "#111827",
+                color: colors.text,
               }}
             >
               Recent Reports
@@ -304,21 +306,21 @@ export default function HomeScreen() {
           {recentReports.length === 0 ? (
             <View
               style={{
-                backgroundColor: "#f9fafb",
+                backgroundColor: colors.softSurface,
                 borderRadius: 16,
                 padding: 32,
                 alignItems: "center",
                 borderWidth: 1,
-                borderColor: "#e5e7eb",
+                borderColor: colors.border,
                 borderStyle: "dashed",
               }}
             >
-              <FileText size={48} color="#9ca3af" />
+              <FileText size={48} color={colors.subtleText} />
               <Text
                 style={{
                   fontSize: 16,
                   fontWeight: "500",
-                  color: "#6b7280",
+                  color: colors.mutedText,
                   marginTop: 12,
                   marginBottom: 8,
                 }}
@@ -328,7 +330,7 @@ export default function HomeScreen() {
               <Text
                 style={{
                   fontSize: 14,
-                  color: "#9ca3af",
+                  color: colors.subtleText,
                   textAlign: "center",
                   marginBottom: 16,
                 }}
@@ -365,11 +367,11 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={report.id}
                   style={{
-                    backgroundColor: "#ffffff",
+                    backgroundColor: colors.surface,
                     borderRadius: 12,
                     padding: 16,
                     borderWidth: 1,
-                    borderColor: "#e5e7eb",
+                    borderColor: colors.border,
                     flexDirection: "row",
                     alignItems: "center",
                   }}
@@ -402,7 +404,7 @@ export default function HomeScreen() {
                       style={{
                         fontSize: 16,
                         fontWeight: "600",
-                        color: "#111827",
+                        color: colors.text,
                         marginBottom: 4,
                       }}
                     >
@@ -415,11 +417,11 @@ export default function HomeScreen() {
                         gap: 8,
                       }}
                     >
-                      <Clock size={14} color="#6b7280" />
+                      <Clock size={14} color={colors.mutedText} />
                       <Text
                         style={{
                           fontSize: 14,
-                          color: "#6b7280",
+                          color: colors.mutedText,
                         }}
                       >
                         {formatDate(report.date)}

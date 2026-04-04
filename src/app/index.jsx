@@ -3,10 +3,12 @@ import { View, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentUser } from "@/utils/backendApi";
+import { useAppTheme } from "@/utils/theme";
 
 export default function Index() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { colors } = useAppTheme();
 
   useEffect(() => {
     let isMounted = true;
@@ -43,13 +45,13 @@ export default function Index() {
     <View
       style={{
         flex: 1,
-        backgroundColor: "#ffffff",
+        backgroundColor: colors.background,
         justifyContent: "center",
         alignItems: "center",
         paddingTop: insets.top,
       }}
     >
-      <ActivityIndicator size="large" color="#2563eb" />
+      <ActivityIndicator size="large" color={colors.primary} />
     </View>
   );
 }

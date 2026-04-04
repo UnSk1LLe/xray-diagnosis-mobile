@@ -20,6 +20,7 @@ import {
   getProfileStats,
   logoutUser,
 } from "@/utils/backendApi";
+import { useAppTheme } from "@/utils/theme";
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
@@ -31,6 +32,8 @@ export default function ProfileScreen() {
   });
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { colors, resolvedTheme, setThemePreference, statusBarStyle, themePreference } =
+    useAppTheme();
 
   useFocusEffect(
     useCallback(() => {
@@ -38,17 +41,33 @@ export default function ProfileScreen() {
 
       const loadProfileData = async () => {
         try {
-          const [profileData, statsData] = await Promise.all([
+          const [profileResult, statsResult] = await Promise.allSettled([
             getProfile(),
             getProfileStats(),
           ]);
+
+          if (profileResult.status !== "fulfilled") {
+            throw profileResult.reason;
+          }
 
           if (!isMounted) {
             return;
           }
 
-          setProfile(profileData);
-          setStats(statsData);
+          setProfile(profileResult.value);
+
+          if (statsResult.status === "fulfilled") {
+            setStats(statsResult.value);
+            return;
+          }
+
+          console.warn("Error loading profile stats:", statsResult.reason);
+          setStats({
+            totalScans: 0,
+            normalResults: 0,
+            abnormalResults: 0,
+            processing: 0,
+          });
         } catch (error) {
           if (isMounted) {
             console.error("Error loading profile:", error);
@@ -95,7 +114,21 @@ export default function ProfileScreen() {
   };
 
   const showSettings = () => {
-    Alert.alert("Settings", "Settings functionality would be implemented here");
+    Alert.alert("Theme", "Choose app theme", [
+      {
+        text: `System${themePreference === "system" ? " (Current)" : ""}`,
+        onPress: () => setThemePreference("system"),
+      },
+      {
+        text: `Light${themePreference === "light" ? " (Current)" : ""}`,
+        onPress: () => setThemePreference("light"),
+      },
+      {
+        text: `Dark${themePreference === "dark" ? " (Current)" : ""}`,
+        onPress: () => setThemePreference("dark"),
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
   };
 
   const showHelp = () => {
@@ -106,8 +139,8 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
-      <StatusBar style="dark" />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={statusBarStyle} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -122,20 +155,20 @@ export default function ProfileScreen() {
             style={{
               width: 100,
               height: 100,
-              backgroundColor: "#eff6ff",
+              backgroundColor: colors.primarySoft,
               borderRadius: 50,
               justifyContent: "center",
               alignItems: "center",
               marginBottom: 16,
             }}
           >
-            <User size={40} color="#2563eb" />
+            <User size={40} color={colors.primary} />
           </View>
           <Text
             style={{
               fontSize: 24,
               fontWeight: "700",
-              color: "#111827",
+              color: colors.text,
               marginBottom: 4,
             }}
           >
@@ -144,7 +177,7 @@ export default function ProfileScreen() {
           <Text
             style={{
               fontSize: 16,
-              color: "#6b7280",
+              color: colors.mutedText,
             }}
           >
             HealthScan Member
@@ -161,7 +194,7 @@ export default function ProfileScreen() {
           <View
             style={{
               flex: 1,
-              backgroundColor: "#eff6ff",
+              backgroundColor: colors.primarySoft,
               borderRadius: 16,
               padding: 20,
               alignItems: "center",
@@ -171,7 +204,7 @@ export default function ProfileScreen() {
               style={{
                 fontSize: 24,
                 fontWeight: "700",
-                color: "#2563eb",
+                color: colors.primary,
                 marginBottom: 4,
               }}
             >
@@ -180,7 +213,7 @@ export default function ProfileScreen() {
             <Text
               style={{
                 fontSize: 14,
-                color: "#6b7280",
+                color: colors.mutedText,
                 textAlign: "center",
               }}
             >
@@ -190,7 +223,7 @@ export default function ProfileScreen() {
           <View
             style={{
               flex: 1,
-              backgroundColor: "#f0fdf4",
+              backgroundColor: colors.successSoft,
               borderRadius: 16,
               padding: 20,
               alignItems: "center",
@@ -200,7 +233,7 @@ export default function ProfileScreen() {
               style={{
                 fontSize: 24,
                 fontWeight: "700",
-                color: "#16a34a",
+                color: colors.success,
                 marginBottom: 4,
               }}
             >
@@ -209,7 +242,7 @@ export default function ProfileScreen() {
             <Text
               style={{
                 fontSize: 14,
-                color: "#6b7280",
+                color: colors.mutedText,
                 textAlign: "center",
               }}
             >
@@ -232,30 +265,30 @@ export default function ProfileScreen() {
                 style={{
                   fontSize: 20,
                   fontWeight: "600",
-                  color: "#111827",
+                  color: colors.text,
                 }}
               >
                 Personal Information
               </Text>
               <TouchableOpacity
                 style={{
-                  backgroundColor: "#f3f4f6",
+                  backgroundColor: colors.elevatedSurface,
                   borderRadius: 8,
                   padding: 8,
                 }}
                 onPress={editProfile}
               >
-                <Edit size={16} color="#6b7280" />
+                <Edit size={16} color={colors.mutedText} />
               </TouchableOpacity>
             </View>
 
             <View
               style={{
-                backgroundColor: "#f8fafc",
+                backgroundColor: colors.mutedSurface,
                 borderRadius: 16,
                 padding: 16,
                 borderWidth: 1,
-                borderColor: "#e2e8f0",
+                borderColor: colors.subtleBorder,
               }}
             >
               {profile.phone ? (
@@ -265,15 +298,15 @@ export default function ProfileScreen() {
                     alignItems: "center",
                     paddingVertical: 12,
                     borderBottomWidth: 1,
-                    borderBottomColor: "#e5e7eb",
+                    borderBottomColor: colors.border,
                   }}
                 >
-                  <Phone size={20} color="#6b7280" />
+                  <Phone size={20} color={colors.mutedText} />
                   <View style={{ marginLeft: 12 }}>
                     <Text
                       style={{
                         fontSize: 14,
-                        color: "#6b7280",
+                        color: colors.mutedText,
                         marginBottom: 2,
                       }}
                     >
@@ -282,7 +315,7 @@ export default function ProfileScreen() {
                     <Text
                       style={{
                         fontSize: 16,
-                        color: "#111827",
+                        color: colors.text,
                         fontWeight: "500",
                       }}
                     >
@@ -299,15 +332,15 @@ export default function ProfileScreen() {
                     alignItems: "center",
                     paddingVertical: 12,
                     borderBottomWidth: 1,
-                    borderBottomColor: "#e5e7eb",
+                    borderBottomColor: colors.border,
                   }}
                 >
-                  <Calendar size={20} color="#6b7280" />
+                  <Calendar size={20} color={colors.mutedText} />
                   <View style={{ marginLeft: 12 }}>
                     <Text
                       style={{
                         fontSize: 14,
-                        color: "#6b7280",
+                        color: colors.mutedText,
                         marginBottom: 2,
                       }}
                     >
@@ -316,7 +349,7 @@ export default function ProfileScreen() {
                     <Text
                       style={{
                         fontSize: 16,
-                        color: "#111827",
+                        color: colors.text,
                         fontWeight: "500",
                       }}
                     >
@@ -333,15 +366,15 @@ export default function ProfileScreen() {
                     alignItems: "center",
                     paddingVertical: 12,
                     borderBottomWidth: 1,
-                    borderBottomColor: "#e5e7eb",
+                    borderBottomColor: colors.border,
                   }}
                 >
-                  <User size={20} color="#6b7280" />
+                  <User size={20} color={colors.mutedText} />
                   <View style={{ marginLeft: 12 }}>
                     <Text
                       style={{
                         fontSize: 14,
-                        color: "#6b7280",
+                        color: colors.mutedText,
                         marginBottom: 2,
                       }}
                     >
@@ -350,7 +383,7 @@ export default function ProfileScreen() {
                     <Text
                       style={{
                         fontSize: 16,
-                        color: "#111827",
+                        color: colors.text,
                         fontWeight: "500",
                       }}
                     >
@@ -367,15 +400,15 @@ export default function ProfileScreen() {
                     alignItems: "center",
                     paddingVertical: 12,
                     borderBottomWidth: 1,
-                    borderBottomColor: "#e5e7eb",
+                    borderBottomColor: colors.border,
                   }}
                 >
-                  <MapPin size={20} color="#6b7280" />
+                  <MapPin size={20} color={colors.mutedText} />
                   <View style={{ marginLeft: 12, flex: 1 }}>
                     <Text
                       style={{
                         fontSize: 14,
-                        color: "#6b7280",
+                        color: colors.mutedText,
                         marginBottom: 2,
                       }}
                     >
@@ -384,7 +417,7 @@ export default function ProfileScreen() {
                     <Text
                       style={{
                         fontSize: 16,
-                        color: "#111827",
+                        color: colors.text,
                         fontWeight: "500",
                         lineHeight: 22,
                       }}
@@ -403,12 +436,12 @@ export default function ProfileScreen() {
                     paddingVertical: 12,
                   }}
                 >
-                  <Phone size={20} color="#6b7280" />
+                  <Phone size={20} color={colors.mutedText} />
                   <View style={{ marginLeft: 12 }}>
                     <Text
                       style={{
                         fontSize: 14,
-                        color: "#6b7280",
+                        color: colors.mutedText,
                         marginBottom: 2,
                       }}
                     >
@@ -417,7 +450,7 @@ export default function ProfileScreen() {
                     <Text
                       style={{
                         fontSize: 16,
-                        color: "#111827",
+                        color: colors.text,
                         fontWeight: "500",
                       }}
                     >
@@ -435,7 +468,7 @@ export default function ProfileScreen() {
             style={{
               fontSize: 20,
               fontWeight: "600",
-              color: "#111827",
+              color: colors.text,
               marginBottom: 16,
             }}
           >
@@ -444,10 +477,10 @@ export default function ProfileScreen() {
 
           <View
             style={{
-              backgroundColor: "#ffffff",
+              backgroundColor: colors.surface,
               borderRadius: 16,
               borderWidth: 1,
-              borderColor: "#e5e7eb",
+              borderColor: colors.border,
             }}
           >
             <TouchableOpacity
@@ -456,22 +489,24 @@ export default function ProfileScreen() {
                 alignItems: "center",
                 padding: 16,
                 borderBottomWidth: 1,
-                borderBottomColor: "#e5e7eb",
+                borderBottomColor: colors.border,
               }}
               onPress={showSettings}
             >
-              <Settings size={20} color="#6b7280" />
+              <Settings size={20} color={colors.mutedText} />
               <Text
                 style={{
                   fontSize: 16,
-                  color: "#111827",
+                  color: colors.text,
                   marginLeft: 12,
                   flex: 1,
                 }}
               >
-                App Settings
+                Theme
               </Text>
-              <Text style={{ color: "#9ca3af" }}>{">"}</Text>
+              <Text style={{ color: colors.subtleText }}>
+                {resolvedTheme[0].toUpperCase() + resolvedTheme.slice(1)}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -480,22 +515,22 @@ export default function ProfileScreen() {
                 alignItems: "center",
                 padding: 16,
                 borderBottomWidth: 1,
-                borderBottomColor: "#e5e7eb",
+                borderBottomColor: colors.border,
               }}
               onPress={showHelp}
             >
-              <HelpCircle size={20} color="#6b7280" />
+              <HelpCircle size={20} color={colors.mutedText} />
               <Text
                 style={{
                   fontSize: 16,
-                  color: "#111827",
+                  color: colors.text,
                   marginLeft: 12,
                   flex: 1,
                 }}
               >
                 Help & Support
               </Text>
-              <Text style={{ color: "#9ca3af" }}>{">"}</Text>
+              <Text style={{ color: colors.subtleText }}>{">"}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -517,14 +552,14 @@ export default function ProfileScreen() {
               >
                 Logout
               </Text>
-              <Text style={{ color: "#9ca3af" }}>{">"}</Text>
+              <Text style={{ color: colors.subtleText }}>{">"}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View
           style={{
-            backgroundColor: "#f9fafb",
+            backgroundColor: colors.softSurface,
             borderRadius: 12,
             padding: 16,
             alignItems: "center",
@@ -533,7 +568,7 @@ export default function ProfileScreen() {
           <Text
             style={{
               fontSize: 14,
-              color: "#6b7280",
+              color: colors.mutedText,
               textAlign: "center",
               lineHeight: 20,
             }}

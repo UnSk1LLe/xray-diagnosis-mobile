@@ -1,8 +1,10 @@
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect, useState } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider, useAppTheme } from "@/utils/theme";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -16,6 +18,24 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function AppNavigator() {
+  const { colors } = useAppTheme();
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Stack screenOptions={{ headerShown: false }} initialRouteName="index">
+          <Stack.Screen name="index" />
+          <Stack.Screen name="auth/phone" />
+          <Stack.Screen name="auth/otp" />
+          <Stack.Screen name="onboarding/personal-info" />
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+      </View>
+    </GestureHandlerRootView>
+  );
+}
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -36,15 +56,9 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <Stack screenOptions={{ headerShown: false }} initialRouteName="index">
-          <Stack.Screen name="index" />
-          <Stack.Screen name="auth/phone" />
-          <Stack.Screen name="auth/otp" />
-          <Stack.Screen name="onboarding/personal-info" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      </GestureHandlerRootView>
+      <ThemeProvider>
+        <AppNavigator />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

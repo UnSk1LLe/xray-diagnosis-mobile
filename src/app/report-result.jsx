@@ -19,8 +19,9 @@ import {
   Share2,
   Download,
 } from "lucide-react-native";
-import { Image } from "expo-image";
 import { asString, getReport } from "@/utils/backendApi";
+import SafeImage from "@/components/SafeImage";
+import { useAppTheme } from "@/utils/theme";
 
 function getStatusStyle(status) {
   if (status === "Normal") {
@@ -56,6 +57,7 @@ export default function ReportResult() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const reportId = asString(params.reportId);
+  const { colors, statusBarStyle } = useAppTheme();
 
   useEffect(() => {
     let isMounted = true;
@@ -95,7 +97,16 @@ export default function ReportResult() {
   }, [reportId, router]);
 
   const formatDate = (dateString) => {
+    if (!dateString) {
+      return "Unknown date";
+    }
+
     const date = new Date(dateString);
+
+    if (Number.isNaN(date.getTime())) {
+      return dateString;
+    }
+
     return date.toLocaleDateString("en-US", {
       weekday: "long",
       year: "numeric",
@@ -151,13 +162,13 @@ export default function ReportResult() {
       <View
         style={{
           flex: 1,
-          backgroundColor: "#ffffff",
+          backgroundColor: colors.background,
           justifyContent: "center",
           alignItems: "center",
           paddingTop: insets.top,
         }}
       >
-        <Text style={{ fontSize: 16, color: "#6b7280" }}>
+        <Text style={{ fontSize: 16, color: colors.mutedText }}>
           Loading report...
         </Text>
       </View>
@@ -169,13 +180,13 @@ export default function ReportResult() {
       <View
         style={{
           flex: 1,
-          backgroundColor: "#ffffff",
+          backgroundColor: colors.background,
           justifyContent: "center",
           alignItems: "center",
           paddingTop: insets.top,
         }}
       >
-        <Text style={{ fontSize: 16, color: "#6b7280" }}>Report not found</Text>
+        <Text style={{ fontSize: 16, color: colors.mutedText }}>Report not found</Text>
       </View>
     );
   }
@@ -183,8 +194,8 @@ export default function ReportResult() {
   const statusStyle = getStatusStyle(report.status);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#ffffff" }}>
-      <StatusBar style="dark" />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar style={statusBarStyle} />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -207,20 +218,20 @@ export default function ReportResult() {
               width: 40,
               height: 40,
               borderRadius: 20,
-              backgroundColor: "#f3f4f6",
+              backgroundColor: colors.elevatedSurface,
               justifyContent: "center",
               alignItems: "center",
               marginRight: 16,
             }}
           >
-            <ArrowLeft size={20} color="#374151" />
+            <ArrowLeft size={20} color={colors.text} />
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text
               style={{
                 fontSize: 24,
                 fontWeight: "700",
-                color: "#111827",
+                color: colors.text,
               }}
             >
               X-Ray Analysis
@@ -232,26 +243,26 @@ export default function ReportResult() {
                 width: 40,
                 height: 40,
                 borderRadius: 20,
-                backgroundColor: "#f3f4f6",
+                backgroundColor: colors.elevatedSurface,
                 justifyContent: "center",
                 alignItems: "center",
               }}
               onPress={shareReport}
             >
-              <Share2 size={18} color="#6b7280" />
+              <Share2 size={18} color={colors.mutedText} />
             </TouchableOpacity>
             <TouchableOpacity
               style={{
                 width: 40,
                 height: 40,
                 borderRadius: 20,
-                backgroundColor: "#f3f4f6",
+                backgroundColor: colors.elevatedSurface,
                 justifyContent: "center",
                 alignItems: "center",
               }}
               onPress={downloadReport}
             >
-              <Download size={18} color="#6b7280" />
+              <Download size={18} color={colors.mutedText} />
             </TouchableOpacity>
           </View>
         </View>
@@ -293,8 +304,8 @@ export default function ReportResult() {
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              <Calendar size={16} color="#6b7280" />
-              <Text style={{ fontSize: 14, color: "#6b7280" }}>
+              <Calendar size={16} color={colors.mutedText} />
+              <Text style={{ fontSize: 14, color: colors.mutedText }}>
                 {formatDate(report.date)}
               </Text>
             </View>
@@ -302,8 +313,8 @@ export default function ReportResult() {
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
               >
-                <Activity size={16} color="#6b7280" />
-                <Text style={{ fontSize: 14, color: "#6b7280" }}>
+                <Activity size={16} color={colors.mutedText} />
+                <Text style={{ fontSize: 14, color: colors.mutedText }}>
                   {report.confidence}% confidence
                 </Text>
               </View>
@@ -317,7 +328,7 @@ export default function ReportResult() {
               style={{
                 fontSize: 18,
                 fontWeight: "600",
-                color: "#111827",
+                color: colors.text,
                 marginBottom: 12,
               }}
             >
@@ -325,21 +336,20 @@ export default function ReportResult() {
             </Text>
             <View
               style={{
-                backgroundColor: "#f8fafc",
+                backgroundColor: colors.mutedSurface,
                 borderRadius: 16,
                 padding: 16,
                 borderWidth: 1,
-                borderColor: "#e2e8f0",
+                borderColor: colors.subtleBorder,
               }}
             >
-              <Image
-                source={{ uri: report.imageUrl }}
+              <SafeImage
+                uri={report.imageUrl}
                 style={{
                   width: "100%",
                   height: 200,
                   borderRadius: 12,
                 }}
-                contentFit="cover"
               />
             </View>
           </View>
@@ -351,7 +361,7 @@ export default function ReportResult() {
               style={{
                 fontSize: 18,
                 fontWeight: "600",
-                color: "#111827",
+                color: colors.text,
                 marginBottom: 12,
               }}
             >
@@ -359,17 +369,17 @@ export default function ReportResult() {
             </Text>
             <View
               style={{
-                backgroundColor: "#f8fafc",
+                backgroundColor: colors.mutedSurface,
                 borderRadius: 16,
                 padding: 16,
                 borderWidth: 1,
-                borderColor: "#e2e8f0",
+                borderColor: colors.subtleBorder,
               }}
             >
               <Text
                 style={{
                   fontSize: 16,
-                  color: "#374151",
+                  color: colors.text,
                   lineHeight: 24,
                 }}
               >
@@ -385,7 +395,7 @@ export default function ReportResult() {
               style={{
                 fontSize: 18,
                 fontWeight: "600",
-                color: "#111827",
+                color: colors.text,
                 marginBottom: 12,
               }}
             >
@@ -393,10 +403,10 @@ export default function ReportResult() {
             </Text>
             <View
               style={{
-                backgroundColor: "#ffffff",
+                backgroundColor: colors.surface,
                 borderRadius: 16,
                 borderWidth: 1,
-                borderColor: "#e5e7eb",
+                borderColor: colors.border,
               }}
             >
               {report.findings.map((finding, index) => (
@@ -405,7 +415,7 @@ export default function ReportResult() {
                   style={{
                     padding: 16,
                     borderBottomWidth: index < report.findings.length - 1 ? 1 : 0,
-                    borderBottomColor: "#e5e7eb",
+                    borderBottomColor: colors.border,
                     flexDirection: "row",
                     alignItems: "flex-start",
                   }}
@@ -423,7 +433,7 @@ export default function ReportResult() {
                   <Text
                     style={{
                       fontSize: 16,
-                      color: "#374151",
+                      color: colors.text,
                       lineHeight: 24,
                       flex: 1,
                     }}
@@ -442,7 +452,7 @@ export default function ReportResult() {
               style={{
                 fontSize: 18,
                 fontWeight: "600",
-                color: "#111827",
+                color: colors.text,
                 marginBottom: 12,
               }}
             >
@@ -450,10 +460,10 @@ export default function ReportResult() {
             </Text>
             <View
               style={{
-                backgroundColor: "#eff6ff",
+                backgroundColor: colors.primarySoft,
                 borderRadius: 16,
                 borderWidth: 1,
-                borderColor: "#bfdbfe",
+                borderColor: colors.primary,
               }}
             >
               {report.recommendations.map((recommendation, index) => (
@@ -463,7 +473,7 @@ export default function ReportResult() {
                     padding: 16,
                     borderBottomWidth:
                       index < report.recommendations.length - 1 ? 1 : 0,
-                    borderBottomColor: "#bfdbfe",
+                    borderBottomColor: colors.primary,
                     flexDirection: "row",
                     alignItems: "flex-start",
                   }}
@@ -481,7 +491,7 @@ export default function ReportResult() {
                   <Text
                     style={{
                       fontSize: 16,
-                      color: "#1e40af",
+                      color: colors.primary,
                       lineHeight: 24,
                       flex: 1,
                     }}
@@ -496,17 +506,17 @@ export default function ReportResult() {
 
         <View
           style={{
-            backgroundColor: "#fef3c7",
+            backgroundColor: colors.warningSoft,
             borderRadius: 12,
             padding: 16,
             borderWidth: 1,
-            borderColor: "#fde68a",
+            borderColor: colors.warning,
           }}
         >
           <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
             <AlertTriangle
               size={20}
-              color="#d97706"
+              color={colors.warning}
               style={{ marginTop: 2, marginRight: 12 }}
             />
             <View style={{ flex: 1 }}>
@@ -514,7 +524,7 @@ export default function ReportResult() {
                 style={{
                   fontSize: 14,
                   fontWeight: "600",
-                  color: "#92400e",
+                  color: colors.warning,
                   marginBottom: 4,
                 }}
               >
@@ -523,7 +533,7 @@ export default function ReportResult() {
               <Text
                 style={{
                   fontSize: 14,
-                  color: "#92400e",
+                  color: colors.warning,
                   lineHeight: 20,
                 }}
               >
