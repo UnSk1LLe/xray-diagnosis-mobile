@@ -153,7 +153,6 @@ export default function ReportsScreen() {
           flex: 1,
           paddingTop: insets.top + 20,
           paddingHorizontal: 24,
-          paddingBottom: insets.bottom + 100,
         }}
       >
         <View style={{ marginBottom: 24 }}>
@@ -213,18 +212,26 @@ export default function ReportsScreen() {
           ))}
         </View>
 
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: insets.bottom + 100,
+          }}
+          showsVerticalScrollIndicator={false}
+        >
           {filteredReports.length === 0 ? (
             <View
               style={{
+                flex: 1,
                 backgroundColor: colors.softSurface,
                 borderRadius: 16,
                 padding: 32,
                 alignItems: "center",
+                justifyContent: "center",
                 borderWidth: 1,
                 borderColor: colors.border,
                 borderStyle: "dashed",
-                marginTop: 40,
               }}
             >
               <FileText size={48} color={colors.subtleText} />

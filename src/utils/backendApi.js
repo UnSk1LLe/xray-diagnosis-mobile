@@ -279,6 +279,21 @@ export async function getProfileStats() {
   };
 }
 
+export async function registerDevice(device) {
+  await apiRequest("/api/v1/profile/devices", {
+    method: "POST",
+    body: JSON.stringify({
+      expo_push_token: device.expoPushToken,
+      device_platform: device.devicePlatform || "",
+      device_model: device.deviceModel || "",
+      os_version: device.osVersion || "",
+      app_version: device.appVersion || "",
+      locale: device.locale || "",
+      timezone: device.timezone || "",
+    }),
+  });
+}
+
 export async function listReports() {
   const response = await apiRequest("/api/v1/reports", {
     method: "GET",

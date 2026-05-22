@@ -1,9 +1,11 @@
 import { Tabs } from "expo-router";
 import { Home, Camera, FileText, User } from "lucide-react-native";
 import { useAppTheme } from "@/utils/theme";
+import { usePushNotifications } from "@/utils/pushNotifications";
 
 export default function TabLayout() {
   const { colors } = useAppTheme();
+  usePushNotifications();
 
   return (
     <Tabs

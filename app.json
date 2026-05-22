@@ -39,6 +39,7 @@
         }
       ],
       "expo-audio",
+      "expo-notifications",
       [
         "expo-build-properties",
         {
@@ -49,7 +50,10 @@
       ],
       [
         "expo-video",
-        { "supportsBackgroundPlayback": true, "supportsPictureInPicture": true }
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
       ],
       "expo-font",
       "expo-secure-store",
@@ -64,12 +68,17 @@
     },
     "extra": {
       "router": {
-        "origin": false
+        "origin": false,
+        "sitemap": false
+      },
+      "eas": {
+        "projectId": "ae0d8784-9694-459b-b6c3-5cc3b90a5920"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "slug": "xray-mobile-app"
+    "slug": "healthscan",
+    "owner": "healthscan"
   }
 }

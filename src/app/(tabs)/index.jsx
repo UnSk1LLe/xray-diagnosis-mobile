@@ -113,7 +113,7 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={{
                 flex: 1,
-                backgroundColor: "#eff6ff",
+                backgroundColor: "#acd0ff",
                 borderRadius: 16,
                 padding: 20,
                 alignItems: "center",
@@ -148,7 +148,7 @@ export default function HomeScreen() {
             <TouchableOpacity
               style={{
                 flex: 1,
-                backgroundColor: "#f0fdf4",
+                backgroundColor: "#a3ffd1",
                 borderRadius: 16,
                 padding: 20,
                 alignItems: "center",

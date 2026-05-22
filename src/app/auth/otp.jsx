@@ -211,19 +211,6 @@ export default function OTPVerification() {
             We've sent a 4-digit code to{"\n"}
             <Text style={{ fontWeight: "600", color: colors.text }}>{phone}</Text>
           </Text>
-          {devOtpCode ? (
-            <Text
-              style={{
-                marginTop: 16,
-                fontSize: 14,
-                color: colors.primary,
-                fontWeight: "600",
-                textAlign: "center",
-              }}
-            >
-              Development OTP: {devOtpCode}
-            </Text>
-          ) : null}
         </View>
 
         <View
