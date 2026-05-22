@@ -8,7 +8,8 @@ import { registerDevice } from "@/utils/backendApi";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -70,6 +71,18 @@ function buildDevicePayload(expoPushToken) {
   };
 }
 
+function redirectFromNotificationResponse(router, response) {
+  const reportId = response?.notification?.request?.content?.data?.report_id;
+  if (!reportId) {
+    return;
+  }
+
+  router.push({
+    pathname: "/report-result",
+    params: { reportId: String(reportId) },
+  });
+}
+
 export function usePushNotifications() {
   const router = useRouter();
 
@@ -97,21 +110,31 @@ export function usePushNotifications() {
   }, []);
 
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const reportId = response?.notification?.request?.content?.data?.report_id;
-        if (!reportId) {
+    let active = true;
+
+    const handleInitialNotification = async () => {
+      try {
+        const lastResponse = await Notifications.getLastNotificationResponseAsync();
+        if (!active || !lastResponse) {
           return;
         }
 
-        router.push({
-          pathname: "/report-result",
-          params: { reportId: String(reportId) },
-        });
+        redirectFromNotificationResponse(router, lastResponse);
+      } catch (error) {
+        console.warn("Initial notification handling failed", error);
+      }
+    };
+
+    handleInitialNotification();
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        redirectFromNotificationResponse(router, response);
       },
     );
 
     return () => {
+      active = false;
       subscription.remove();
     };
   }, [router]);
