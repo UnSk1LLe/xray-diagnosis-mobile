@@ -1,5 +1,12 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  RefreshControl,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
@@ -58,6 +65,7 @@ export default function ReportsScreen() {
   const [filteredReports, setFilteredReports] = useState([]);
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [exportingReportId, setExportingReportId] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors, statusBarStyle } = useAppTheme();
@@ -69,6 +77,14 @@ export default function ReportsScreen() {
 
     return items.filter((report) => report.status === activeStatus);
   }, []);
+
+  const applyReports = useCallback(
+    (reportsData, activeStatus = filterStatus) => {
+      setReports(reportsData);
+      setFilteredReports(filterReports(reportsData, activeStatus));
+    },
+    [filterReports, filterStatus],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -82,8 +98,7 @@ export default function ReportsScreen() {
             return;
           }
 
-          setReports(reportsData);
-          setFilteredReports(filterReports(reportsData, filterStatus));
+          applyReports(reportsData);
         } catch (error) {
           if (isMounted) {
             console.error("Error loading reports:", error);
@@ -97,12 +112,32 @@ export default function ReportsScreen() {
       return () => {
         isMounted = false;
       };
-    }, [filterReports, filterStatus, router]),
+    }, [applyReports, router]),
   );
 
   const handleFilterChange = (status) => {
     setFilterStatus(status);
     setFilteredReports(filterReports(reports, status));
+  };
+
+  const refreshReports = async () => {
+    if (refreshing) {
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      const reportsData = await listReports();
+      applyReports(reportsData);
+    } catch (error) {
+      console.error("Error refreshing reports:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to refresh reports",
+      );
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -256,6 +291,14 @@ export default function ReportsScreen() {
 
         <ScrollView
           style={{ flex: 1 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={refreshReports}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           contentContainerStyle={{
             flexGrow: 1,
             paddingBottom: insets.bottom + 100,
@@ -390,29 +433,35 @@ export default function ReportsScreen() {
                         </View>
                         <View
                           style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            gap: 8,
+                            gap: 6,
                           }}
                         >
-                          <Activity size={14} color={statusColors.icon} />
                           <View
                             style={{
-                              backgroundColor: statusColors.background,
-                              paddingHorizontal: 8,
-                              paddingVertical: 2,
-                              borderRadius: 12,
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: 8,
                             }}
                           >
-                            <Text
+                            <Activity size={14} color={statusColors.icon} />
+                            <View
                               style={{
-                                fontSize: 12,
-                                fontWeight: "500",
-                                color: statusColors.text,
+                                backgroundColor: statusColors.background,
+                                paddingHorizontal: 8,
+                                paddingVertical: 2,
+                                borderRadius: 12,
                               }}
                             >
-                              {formatStatusLabel(report.status)}
-                            </Text>
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: "500",
+                                  color: statusColors.text,
+                                }}
+                              >
+                                {formatStatusLabel(report.status)}
+                              </Text>
+                            </View>
                           </View>
                           {report.confidence ? (
                             <Text
@@ -421,7 +470,7 @@ export default function ReportsScreen() {
                                 color: colors.mutedText,
                               }}
                             >
-                              {report.confidence}% confidence
+                              Confidence: {report.confidence}%
                             </Text>
                           ) : null}
                         </View>
@@ -510,7 +559,26 @@ export default function ReportsScreen() {
                           a moment for the latest status.
                         </Text>
                       </View>
-                    ) : null}
+                    ) : (
+                      <View
+                        style={{
+                          backgroundColor: colors.mutedSurface,
+                          borderRadius: 8,
+                          padding: 12,
+                          marginTop: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 14,
+                            color: colors.mutedText,
+                            lineHeight: 20,
+                          }}
+                        >
+                          No findings
+                        </Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}

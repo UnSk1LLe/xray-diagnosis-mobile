@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
   Share,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -67,16 +68,24 @@ export default function ReportResult() {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
   const reportId = asString(params.reportId);
   const { colors, statusBarStyle } = useAppTheme();
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
 
-    const loadReport = async () => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const loadReport = useCallback(
+    async ({ isRefresh = false } = {}) => {
       if (!reportId) {
         router.back();
         return;
@@ -84,31 +93,48 @@ export default function ReportResult() {
 
       try {
         const reportData = await getReport(reportId);
-
-        if (isMounted) {
-          setReport(reportData);
+        if (!isMountedRef.current) {
+          return;
         }
+
+        setReport(reportData);
       } catch (error) {
-        if (isMounted) {
-          Alert.alert(
-            "Error",
-            error instanceof Error ? error.message : "Failed to load report",
-          );
+        if (!isMountedRef.current) {
+          return;
+        }
+
+        Alert.alert(
+          "Error",
+          error instanceof Error ? error.message : "Failed to load report",
+        );
+        if (!isRefresh) {
           router.back();
         }
       } finally {
-        if (isMounted) {
+        if (isMountedRef.current && !isRefresh) {
           setLoading(false);
         }
       }
-    };
+    },
+    [reportId, router],
+  );
 
+  useEffect(() => {
     loadReport();
+  }, [loadReport]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [reportId, router]);
+  const refreshReport = async () => {
+    if (refreshing) {
+      return;
+    }
+
+    try {
+      setRefreshing(true);
+      await loadReport({ isRefresh: true });
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const formatDate = (dateString) => {
     if (!dateString) {
@@ -240,6 +266,14 @@ export default function ReportResult() {
       <StatusBar style={statusBarStyle} />
       <ScrollView
         style={{ flex: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refreshReport}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         contentContainerStyle={{
           paddingTop: insets.top + 20,
           paddingHorizontal: 24,
@@ -346,7 +380,7 @@ export default function ReportResult() {
               {formatStatusLabel(report.status)}
             </Text>
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+          <View style={{ gap: 10 }}>
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
@@ -361,7 +395,7 @@ export default function ReportResult() {
               >
                 <Activity size={16} color={colors.mutedText} />
                 <Text style={{ fontSize: 14, color: colors.mutedText }}>
-                  {report.confidence}% confidence
+                  Confidence: {report.confidence}%
                 </Text>
               </View>
             ) : null}

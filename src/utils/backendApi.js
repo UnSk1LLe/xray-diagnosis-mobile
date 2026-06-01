@@ -1,4 +1,5 @@
 const rawBaseUrl = process.env.EXPO_PUBLIC_BASE_URL || "http://localhost:8080";
+const MIN_IMAGE_DIMENSION = 512;
 
 const apiBaseUrl = rawBaseUrl.replace(/\/+$/, "");
 
@@ -357,6 +358,19 @@ export async function deleteReport(reportID) {
 export async function createReport(imageAsset) {
   if (!imageAsset?.uri) {
     throw new Error("Selected image is missing a valid file URI.");
+  }
+
+  if (!imageAsset?.width || !imageAsset?.height) {
+    throw new Error("Selected image is missing width or height metadata.");
+  }
+
+  if (
+    imageAsset.width < MIN_IMAGE_DIMENSION ||
+    imageAsset.height < MIN_IMAGE_DIMENSION
+  ) {
+    throw new Error(
+      `Image must be at least ${MIN_IMAGE_DIMENSION}x${MIN_IMAGE_DIMENSION} pixels.`,
+    );
   }
 
   const fileName = imageAsset.fileName || getFileNameFromUri(imageAsset.uri);

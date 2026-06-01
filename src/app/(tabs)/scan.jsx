@@ -21,7 +21,39 @@ import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { createReport } from "@/utils/backendApi";
 import { useAppTheme } from "@/utils/theme";
 
+const MIN_IMAGE_DIMENSION = 512;
 const MAX_IMAGE_DIMENSION = 1600;
+
+function getAssetExtension(asset) {
+  const fileName = asset?.fileName ?? asset?.uri ?? "";
+  const sanitized = typeof fileName === "string" ? fileName.split("?")[0] : "";
+  const extension = sanitized.split(".").pop()?.toLowerCase();
+
+  return extension || "";
+}
+
+function needsJpegNormalization(asset) {
+  const mimeType = asset?.mimeType?.toLowerCase?.() || "";
+  const extension = getAssetExtension(asset);
+
+  return (
+    mimeType === "image/heic" ||
+    mimeType === "image/heif" ||
+    mimeType === "image/webp" ||
+    extension === "heic" ||
+    extension === "heif" ||
+    extension === "webp"
+  );
+}
+
+function hasMinimumImageResolution(asset) {
+  return (
+    Number.isFinite(asset?.width) &&
+    Number.isFinite(asset?.height) &&
+    asset.width >= MIN_IMAGE_DIMENSION &&
+    asset.height >= MIN_IMAGE_DIMENSION
+  );
+}
 
 function summarizeAsset(asset) {
   if (!asset) {
@@ -57,20 +89,23 @@ export default function ScanScreen() {
     }
 
     const longestSide = Math.max(asset.width, asset.height);
+    const shouldNormalizeToJpeg = needsJpegNormalization(asset);
     console.log("[scan] optimizeImageAsset:dimensions", {
       width: asset.width,
       height: asset.height,
       longestSide,
+      shouldNormalizeToJpeg,
     });
 
-    if (longestSide <= MAX_IMAGE_DIMENSION) {
+    if (longestSide <= MAX_IMAGE_DIMENSION && !shouldNormalizeToJpeg) {
       console.log("[scan] optimizeImageAsset:skip-resize", {
         maxDimension: MAX_IMAGE_DIMENSION,
       });
       return asset;
     }
 
-    const scale = MAX_IMAGE_DIMENSION / longestSide;
+    const scale =
+      longestSide > MAX_IMAGE_DIMENSION ? MAX_IMAGE_DIMENSION / longestSide : 1;
     const width = Math.round(asset.width * scale);
     const height = Math.round(asset.height * scale);
     const optimizedImage = await manipulateAsync(
@@ -95,7 +130,10 @@ export default function ScanScreen() {
       uri: optimizedImage.uri,
       width: optimizedImage.width,
       height: optimizedImage.height,
-      fileName: asset.fileName || "xray.jpg",
+      fileName: (asset.fileName || "xray.jpg").replace(
+        /\.(heic|heif|webp)$/i,
+        ".jpg",
+      ),
       mimeType: "image/jpeg",
     };
   };
@@ -105,7 +143,32 @@ export default function ScanScreen() {
     setPreparingImage(true);
 
     try {
+      if (!asset?.width || !asset?.height) {
+        Alert.alert(
+          "Invalid image",
+          "We could not read the image dimensions. Please choose a different image.",
+        );
+        return;
+      }
+
+      if (!hasMinimumImageResolution(asset)) {
+        Alert.alert(
+          "Image too small",
+          `Please choose an image that is at least ${MIN_IMAGE_DIMENSION}x${MIN_IMAGE_DIMENSION} pixels.`,
+        );
+        return;
+      }
+
       const optimizedAsset = await optimizeImageAsset(asset);
+
+      if (!hasMinimumImageResolution(optimizedAsset)) {
+        Alert.alert(
+          "Image too small",
+          `Please choose an image that is at least ${MIN_IMAGE_DIMENSION}x${MIN_IMAGE_DIMENSION} pixels.`,
+        );
+        return;
+      }
+
       console.log(
         "[scan] handleSelectedAsset:setSelectedImage",
         summarizeAsset(optimizedAsset),
@@ -136,8 +199,6 @@ export default function ScanScreen() {
       console.log("[scan] pickImageFromLibrary:launch");
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [4, 3],
         quality: 0.8,
       });
       console.log("[scan] pickImageFromLibrary:result", {
@@ -171,8 +232,6 @@ export default function ScanScreen() {
       console.log("[scan] takePhoto:launch");
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [4, 3],
         quality: 0.8,
       });
       console.log("[scan] takePhoto:result", {
