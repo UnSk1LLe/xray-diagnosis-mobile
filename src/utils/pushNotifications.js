@@ -1,10 +1,17 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
-import { registerDevice } from "@/utils/backendApi";
+import {
+  getCurrentUser,
+  registerDevice,
+  unregisterDevice,
+} from "@/utils/backendApi";
+
+const PUSH_TOKEN_SYNC_STORAGE_KEY = "pushNotifications:lastSyncedRegistration";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -53,6 +60,46 @@ async function registerForPushNotificationsAsync() {
   return tokenResponse.data || null;
 }
 
+async function getLastSyncedRegistration() {
+  try {
+    const rawValue = await AsyncStorage.getItem(PUSH_TOKEN_SYNC_STORAGE_KEY);
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(rawValue);
+    if (
+      typeof parsedValue?.token !== "string" ||
+      typeof parsedValue?.userId !== "number"
+    ) {
+      return null;
+    }
+
+    return parsedValue;
+  } catch {
+    return null;
+  }
+}
+
+async function setLastSyncedRegistration(userId, token) {
+  await AsyncStorage.setItem(
+    PUSH_TOKEN_SYNC_STORAGE_KEY,
+    JSON.stringify({ userId, token }),
+  );
+}
+
+export async function rememberPushRegistrationSynced(userId, token) {
+  if (!userId || !token) {
+    return;
+  }
+
+  await setLastSyncedRegistration(userId, token);
+}
+
+export async function clearStoredPushRegistration() {
+  await AsyncStorage.removeItem(PUSH_TOKEN_SYNC_STORAGE_KEY);
+}
+
 function buildDevicePayload(expoPushToken) {
   const locale = Intl.DateTimeFormat().resolvedOptions().locale || "";
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
@@ -71,6 +118,15 @@ function buildDevicePayload(expoPushToken) {
   };
 }
 
+export async function preparePushRegistrationPayload() {
+  const expoPushToken = await registerForPushNotificationsAsync();
+  if (!expoPushToken) {
+    return null;
+  }
+
+  return buildDevicePayload(expoPushToken);
+}
+
 function redirectFromNotificationResponse(router, response) {
   const reportId = response?.notification?.request?.content?.data?.report_id;
   if (!reportId) {
@@ -83,26 +139,73 @@ function redirectFromNotificationResponse(router, response) {
   });
 }
 
+export async function syncPushNotificationsForUser(userId) {
+  if (!userId) {
+    return false;
+  }
+
+  const registrationPayload = await preparePushRegistrationPayload();
+  if (!registrationPayload?.expoPushToken) {
+    return false;
+  }
+
+  console.log("[pushNotifications] gathered Expo push token", {
+    userId,
+    expoPushToken: registrationPayload.expoPushToken,
+  });
+
+  const existingRegistration = await getLastSyncedRegistration();
+  if (
+    existingRegistration?.userId === userId &&
+    existingRegistration?.token === registrationPayload.expoPushToken
+  ) {
+    return false;
+  }
+
+  await registerDevice(registrationPayload);
+  await setLastSyncedRegistration(userId, registrationPayload.expoPushToken);
+
+  return true;
+}
+
+export async function unregisterPushNotificationsForUser(userId) {
+  const existingRegistration = await getLastSyncedRegistration();
+
+  if (
+    !existingRegistration?.token ||
+    !userId ||
+    existingRegistration.userId !== userId
+  ) {
+    await clearStoredPushRegistration();
+    return false;
+  }
+
+  await unregisterDevice({ expoPushToken: existingRegistration.token });
+  await clearStoredPushRegistration();
+
+  return true;
+}
+
 export function usePushNotifications() {
   const router = useRouter();
 
   useEffect(() => {
     let active = true;
 
-    const register = async () => {
+    const syncRegistration = async () => {
       try {
-        const expoPushToken = await registerForPushNotificationsAsync();
-        if (!active || !expoPushToken) {
+        const currentUser = await getCurrentUser();
+        if (!active || !currentUser?.id) {
           return;
         }
 
-        await registerDevice(buildDevicePayload(expoPushToken));
+        await syncPushNotificationsForUser(currentUser.id);
       } catch (error) {
         console.warn("Push notification setup failed", error);
       }
     };
 
-    register();
+    syncRegistration();
 
     return () => {
       active = false;

@@ -5,12 +5,20 @@ import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { FileText, Calendar, Activity, Download, Trash2 } from "lucide-react-native";
-import { deleteReport, listReports } from "@/utils/backendApi";
+import { deleteReport, getReport, listReports } from "@/utils/backendApi";
+import { exportReportToPdf } from "@/utils/reportPdf";
 import SafeImage from "@/components/SafeImage";
 import { useAppTheme } from "@/utils/theme";
 
+const STATUS_FILTERS = [
+  { key: "ALL", label: "All" },
+  { key: "PROCESSING", label: "Processing" },
+  { key: "AWAITING_REVIEW", label: "Awaiting Review" },
+  { key: "REVIEWED", label: "Reviewed" },
+];
+
 function getStatusColors(status, colors) {
-  if (status === "Normal") {
+  if (status === "REVIEWED") {
     return {
       icon: colors.success,
       text: colors.success,
@@ -18,42 +26,48 @@ function getStatusColors(status, colors) {
     };
   }
 
-  if (status === "Processing") {
+  if (status === "PROCESSING") {
     return {
-      icon: colors.primary,
-      text: colors.primary,
-      background: colors.primarySoft,
+      icon: colors.warning,
+      text: colors.warning,
+      background: colors.warningSoft,
     };
   }
 
   return {
-    icon: colors.warning,
-    text: colors.warning,
-    background: colors.warningSoft,
+    icon: colors.primary,
+    text: colors.primary,
+    background: colors.primarySoft,
   };
+}
+
+function formatStatusLabel(status) {
+  if (!status) {
+    return "Unknown";
+  }
+
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export default function ReportsScreen() {
   const [reports, setReports] = useState([]);
   const [filteredReports, setFilteredReports] = useState([]);
-  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [exportingReportId, setExportingReportId] = useState("");
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { colors, statusBarStyle } = useAppTheme();
 
   const filterReports = useCallback((items, activeStatus) => {
-    if (activeStatus === "All") {
+    if (activeStatus === "ALL") {
       return items;
     }
 
-    if (activeStatus === "Normal") {
-      return items.filter((report) => report.status === "Normal");
-    }
-
-    return items.filter(
-      (report) =>
-        report.status !== "Normal" && report.status !== "Processing",
-    );
+    return items.filter((report) => report.status === activeStatus);
   }, []);
 
   useFocusEffect(
@@ -138,11 +152,27 @@ export default function ReportsScreen() {
     );
   };
 
-  const exportReport = () => {
-    Alert.alert(
-      "Export Report",
-      "Report export functionality would be implemented here",
-    );
+  const exportReport = async (reportId) => {
+    if (!reportId || exportingReportId === reportId) {
+      return;
+    }
+
+    try {
+      setExportingReportId(reportId);
+      const fullReport = await getReport(reportId);
+      const pdfResult = await exportReportToPdf(fullReport);
+
+      if (!pdfResult.shared) {
+        Alert.alert("PDF generated", `Saved to temporary file:\n${pdfResult.uri}`);
+      }
+    } catch (error) {
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "Failed to export report",
+      );
+    } finally {
+      setExportingReportId("");
+    }
   };
 
   return (
@@ -177,40 +207,52 @@ export default function ReportsScreen() {
           </Text>
         </View>
 
-        <View
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
           style={{
+            flexGrow: 0,
+            marginBottom: 24,
+          }}
+          contentContainerStyle={{
             flexDirection: "row",
+            alignItems: "center",
             backgroundColor: colors.elevatedSurface,
             borderRadius: 12,
             padding: 4,
-            marginBottom: 24,
+            gap: 4,
           }}
         >
-          {["All", "Normal", "Abnormal"].map((status) => (
+          {STATUS_FILTERS.map((statusOption) => (
             <TouchableOpacity
-              key={status}
+              key={statusOption.key}
               style={{
-                flex: 1,
                 backgroundColor:
-                  filterStatus === status ? colors.surface : "transparent",
+                  filterStatus === statusOption.key
+                    ? colors.surface
+                    : "transparent",
                 borderRadius: 8,
                 paddingVertical: 8,
+                paddingHorizontal: 14,
                 alignItems: "center",
               }}
-              onPress={() => handleFilterChange(status)}
+              onPress={() => handleFilterChange(statusOption.key)}
             >
               <Text
                 style={{
                   fontSize: 14,
                   fontWeight: "600",
-                  color: filterStatus === status ? colors.text : colors.mutedText,
+                  color:
+                    filterStatus === statusOption.key
+                      ? colors.text
+                      : colors.mutedText,
                 }}
               >
-                {status}
+                {statusOption.label}
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
 
         <ScrollView
           style={{ flex: 1 }}
@@ -244,9 +286,9 @@ export default function ReportsScreen() {
                   marginBottom: 8,
                 }}
               >
-                {filterStatus === "All"
+                {filterStatus === "ALL"
                   ? "No reports yet"
-                  : `No ${filterStatus.toLowerCase()} reports`}
+                  : `No ${formatStatusLabel(filterStatus).toLowerCase()} reports`}
               </Text>
               <Text
                 style={{
@@ -255,9 +297,9 @@ export default function ReportsScreen() {
                   textAlign: "center",
                 }}
               >
-                {filterStatus === "All"
+                {filterStatus === "ALL"
                   ? "Upload your first X-ray scan to get started"
-                  : `You don't have any ${filterStatus.toLowerCase()} reports yet`}
+                  : `You don't have any ${formatStatusLabel(filterStatus).toLowerCase()} reports yet`}
               </Text>
             </View>
           ) : (
@@ -369,7 +411,7 @@ export default function ReportsScreen() {
                                 color: statusColors.text,
                               }}
                             >
-                              {report.status}
+                              {formatStatusLabel(report.status)}
                             </Text>
                           </View>
                           {report.confidence ? (
@@ -399,8 +441,13 @@ export default function ReportsScreen() {
                             backgroundColor: colors.elevatedSurface,
                             justifyContent: "center",
                             alignItems: "center",
+                            opacity: exportingReportId === report.id ? 0.5 : 1,
                           }}
-                          onPress={exportReport}
+                          onPress={(event) => {
+                            event.stopPropagation?.();
+                            exportReport(report.id);
+                          }}
+                          disabled={exportingReportId === report.id}
                         >
                           <Download size={16} color={colors.mutedText} />
                         </TouchableOpacity>
@@ -413,7 +460,10 @@ export default function ReportsScreen() {
                             justifyContent: "center",
                             alignItems: "center",
                           }}
-                          onPress={() => removeReport(report.id)}
+                          onPress={(event) => {
+                            event.stopPropagation?.();
+                            removeReport(report.id);
+                          }}
                         >
                           <Trash2 size={16} color={colors.danger} />
                         </TouchableOpacity>
@@ -440,7 +490,7 @@ export default function ReportsScreen() {
                           {report.findings.length > 1 ? "..." : ""}
                         </Text>
                       </View>
-                    ) : report.status === "Processing" ? (
+                    ) : report.status === "PROCESSING" ? (
                       <View
                         style={{
                           backgroundColor: colors.primarySoft,

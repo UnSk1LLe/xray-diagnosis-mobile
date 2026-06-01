@@ -8,6 +8,39 @@ import { Camera, FileText, Activity, Clock, Plus } from "lucide-react-native";
 import { getProfile, listReports } from "@/utils/backendApi";
 import { useAppTheme } from "@/utils/theme";
 
+function formatStatusLabel(status) {
+  if (!status) {
+    return "Unknown";
+  }
+
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getStatusColors(status) {
+  if (status === "REVIEWED") {
+    return {
+      background: "#dcfce7",
+      text: "#16a34a",
+    };
+  }
+
+  if (status === "PROCESSING") {
+    return {
+      background: "#fef3c7",
+      text: "#d97706",
+    };
+  }
+
+  return {
+    background: "#dbeafe",
+    text: "#2563eb",
+  };
+}
+
 export default function HomeScreen() {
   const [profile, setProfile] = useState(null);
   const [reports, setReports] = useState([]);
@@ -49,10 +82,14 @@ export default function HomeScreen() {
   );
 
   const recentReports = reports.slice(0, 3);
-  const normalResults = reports.filter((report) => report.status === "Normal").length;
-  const abnormalResults = reports.filter(
-    (report) =>
-      report.status !== "Normal" && report.status !== "Processing",
+  const processingReports = reports.filter(
+    (report) => report.status === "PROCESSING",
+  ).length;
+  const awaitingReviewReports = reports.filter(
+    (report) => report.status === "AWAITING_REVIEW",
+  ).length;
+  const reviewedReports = reports.filter(
+    (report) => report.status === "REVIEWED",
   ).length;
 
   const formatDate = (dateString) => {
@@ -205,11 +242,11 @@ export default function HomeScreen() {
             <View
               style={{
                 flexDirection: "row",
-                justifyContent: "space-between",
-                marginBottom: 16,
+                flexWrap: "wrap",
+                gap: 12,
               }}
             >
-              <View style={{ alignItems: "center" }}>
+              <View style={{ width: "47%", alignItems: "center" }}>
                 <Text
                   style={{
                     fontSize: 24,
@@ -228,15 +265,15 @@ export default function HomeScreen() {
                   Total Scans
                 </Text>
               </View>
-              <View style={{ alignItems: "center" }}>
+              <View style={{ width: "47%", alignItems: "center" }}>
                 <Text
                   style={{
                     fontSize: 24,
                     fontWeight: "700",
-                    color: "#16a34a",
+                    color: "#2563eb",
                   }}
                 >
-                  {normalResults}
+                  {processingReports}
                 </Text>
                 <Text
                   style={{
@@ -244,10 +281,10 @@ export default function HomeScreen() {
                     color: colors.mutedText,
                   }}
                 >
-                  Normal Results
+                  Processing
                 </Text>
               </View>
-              <View style={{ alignItems: "center" }}>
+              <View style={{ width: "47%", alignItems: "center" }}>
                 <Text
                   style={{
                     fontSize: 24,
@@ -255,7 +292,7 @@ export default function HomeScreen() {
                     color: "#d97706",
                   }}
                 >
-                  {abnormalResults}
+                  {awaitingReviewReports}
                 </Text>
                 <Text
                   style={{
@@ -263,7 +300,26 @@ export default function HomeScreen() {
                     color: colors.mutedText,
                   }}
                 >
-                  Needs Review
+                  Awaiting Review
+                </Text>
+              </View>
+              <View style={{ width: "47%", alignItems: "center" }}>
+                <Text
+                  style={{
+                    fontSize: 24,
+                    fontWeight: "700",
+                    color: "#16a34a",
+                  }}
+                >
+                  {reviewedReports}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    color: colors.mutedText,
+                  }}
+                >
+                  Reviewed
                 </Text>
               </View>
             </View>
@@ -363,95 +419,91 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={{ gap: 12 }}>
-              {recentReports.map((report) => (
-                <TouchableOpacity
-                  key={report.id}
-                  style={{
-                    backgroundColor: colors.surface,
-                    borderRadius: 12,
-                    padding: 16,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    flexDirection: "row",
-                    alignItems: "center",
-                  }}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/report-result",
-                      params: { reportId: report.id },
-                    })
-                  }
-                >
-                  <View
+              {recentReports.map((report) => {
+                const statusColors = getStatusColors(report.status);
+
+                return (
+                  <TouchableOpacity
+                    key={report.id}
                     style={{
-                      width: 40,
-                      height: 40,
-                      backgroundColor:
-                        report.status === "Normal" ? "#dcfce7" : "#fef3c7",
-                      borderRadius: 20,
-                      justifyContent: "center",
+                      backgroundColor: colors.surface,
+                      borderRadius: 12,
+                      padding: 16,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      flexDirection: "row",
                       alignItems: "center",
-                      marginRight: 12,
                     }}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/report-result",
+                        params: { reportId: report.id },
+                      })
+                    }
                   >
-                    <Activity
-                      size={20}
-                      color={report.status === "Normal" ? "#16a34a" : "#d97706"}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: "600",
-                        color: colors.text,
-                        marginBottom: 4,
-                      }}
-                    >
-                      Chest X-Ray Report
-                    </Text>
                     <View
                       style={{
-                        flexDirection: "row",
+                        width: 40,
+                        height: 40,
+                        backgroundColor: statusColors.background,
+                        borderRadius: 20,
+                        justifyContent: "center",
                         alignItems: "center",
-                        gap: 8,
+                        marginRight: 12,
                       }}
                     >
-                      <Clock size={14} color={colors.mutedText} />
+                      <Activity size={20} color={statusColors.text} />
+                    </View>
+                    <View style={{ flex: 1 }}>
                       <Text
                         style={{
-                          fontSize: 14,
-                          color: colors.mutedText,
+                          fontSize: 16,
+                          fontWeight: "600",
+                          color: colors.text,
+                          marginBottom: 4,
                         }}
                       >
-                        {formatDate(report.date)}
+                        Chest X-Ray Report
                       </Text>
                       <View
                         style={{
-                          backgroundColor:
-                            report.status === "Normal" ? "#dcfce7" : "#fef3c7",
-                          paddingHorizontal: 8,
-                          paddingVertical: 2,
-                          borderRadius: 12,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 8,
                         }}
                       >
+                        <Clock size={14} color={colors.mutedText} />
                         <Text
                           style={{
-                            fontSize: 12,
-                            fontWeight: "500",
-                            color:
-                              report.status === "Normal"
-                                ? "#16a34a"
-                                : "#d97706",
+                            fontSize: 14,
+                            color: colors.mutedText,
                           }}
                         >
-                          {report.status}
+                          {formatDate(report.date)}
                         </Text>
+                        <View
+                          style={{
+                            backgroundColor: statusColors.background,
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderRadius: 12,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: "500",
+                              color: statusColors.text,
+                            }}
+                          >
+                            {formatStatusLabel(report.status)}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
         </View>

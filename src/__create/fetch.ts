@@ -62,6 +62,8 @@ const fetchToWeb = async function fetchWithHeaders(...args: Params) {
 
   const initHeaders = init?.headers ?? {};
   const finalHeaders = new Headers(initHeaders);
+  const isMultipartFormData =
+    typeof FormData !== 'undefined' && init?.body instanceof FormData;
 
   const headers = {
     'x-createxyz-project-group-id': process.env.EXPO_PUBLIC_PROJECT_GROUP_ID,
@@ -86,6 +88,17 @@ const fetchToWeb = async function fetchWithHeaders(...args: Params) {
 
   if (auth) {
     finalHeaders.set('authorization', `Bearer ${auth.jwt}`);
+  }
+
+  // `expo/fetch` currently rejects React Native file-style FormData parts
+  // such as `{ uri, name, type }`, which breaks iOS uploads from the image
+  // picker. Fall back to the native fetch implementation for multipart bodies
+  // while preserving the same URL normalization and auth headers.
+  if (isMultipartFormData) {
+    return originalFetch(finalInput, {
+      ...init,
+      headers: finalHeaders,
+    });
   }
 
   return expoFetch(finalInput, {

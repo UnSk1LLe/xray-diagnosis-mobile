@@ -164,7 +164,7 @@ export function mapReport(report) {
     imageId: report?.image_id ?? null,
     date: report?.date ?? "",
     imageUrl: report?.image_url ?? "",
-    status: report?.status ?? "Processing",
+    status: report?.status ?? "PROCESSING",
     queueStatus: report?.queue_status ?? "queued",
     findings: Array.isArray(report?.findings) ? report.findings : [],
     recommendations: Array.isArray(report?.recommendations)
@@ -173,6 +173,27 @@ export function mapReport(report) {
     confidence: report?.confidence ?? 0,
     aiAnalysis: report?.ai_analysis ?? "",
     comment: report?.comment ?? "",
+    doctorComment: report?.doctor_comment ?? "",
+    reviewOutcome: report?.review_outcome ?? "",
+    reviewedAt: report?.reviewed_at ?? "",
+    summary: report?.summary ?? "",
+    imageQuality: report?.image_quality || null,
+    structuredFindings: Array.isArray(report?.structured_findings)
+      ? report.structured_findings
+      : [],
+    topFindings: Array.isArray(report?.top_findings) ? report.top_findings : [],
+    structuredRecommendations: Array.isArray(report?.structured_recommendations)
+      ? report.structured_recommendations
+      : [],
+    limitations: Array.isArray(report?.limitations) ? report.limitations : [],
+    disclaimer: report?.disclaimer ?? "",
+    modelName: report?.model_name ?? "",
+    modelVersion: report?.model_version ?? "",
+    heatmapUrl: report?.heatmap_url ?? "",
+    explainabilityText: report?.explainability_text ?? "",
+    modelReport: report?.model_report || null,
+    aiResults: report?.ai_results || null,
+    doctorResults: report?.doctor_results || null,
   };
 }
 
@@ -190,12 +211,19 @@ export async function requestOTP(phone) {
   };
 }
 
-export async function verifyOTP(phone, otpCode) {
+export async function verifyOTP(phone, otpCode, device = null) {
   const response = await apiRequest("/api/v1/auth/verify-otp", {
     method: "POST",
     body: JSON.stringify({
       phone,
       otp_code: otpCode,
+      expo_push_token: device?.expoPushToken || "",
+      device_platform: device?.devicePlatform || "",
+      device_model: device?.deviceModel || "",
+      os_version: device?.osVersion || "",
+      app_version: device?.appVersion || "",
+      locale: device?.locale || "",
+      timezone: device?.timezone || "",
     }),
   });
   const data = response?.data || {};
@@ -273,9 +301,9 @@ export async function getProfileStats() {
 
   return {
     totalScans: stats.total_scans || 0,
-    normalResults: stats.normal_results || 0,
-    abnormalResults: stats.abnormal_results || 0,
     processing: stats.processing || 0,
+    awaitingReview: stats.awaiting_review || 0,
+    reviewedReports: stats.reviewed_reports || 0,
   };
 }
 
@@ -290,6 +318,15 @@ export async function registerDevice(device) {
       app_version: device.appVersion || "",
       locale: device.locale || "",
       timezone: device.timezone || "",
+    }),
+  });
+}
+
+export async function unregisterDevice(device) {
+  await apiRequest("/api/v1/profile/devices/unregister", {
+    method: "POST",
+    body: JSON.stringify({
+      expo_push_token: device.expoPushToken,
     }),
   });
 }

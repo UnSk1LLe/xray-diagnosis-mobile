@@ -18,6 +18,11 @@ import {
   requestOTP,
   verifyOTP,
 } from "@/utils/backendApi";
+import {
+  preparePushRegistrationPayload,
+  rememberPushRegistrationSynced,
+  syncPushNotificationsForUser,
+} from "@/utils/pushNotifications";
 import { useAppTheme } from "@/utils/theme";
 
 const OTP_LENGTH = 4;
@@ -28,6 +33,7 @@ export default function OTPVerification() {
   const [resendLoading, setResendLoading] = useState(false);
   const [timer, setTimer] = useState(30);
   const [devOtpCode, setDevOtpCode] = useState("");
+  const [pushRegistration, setPushRegistration] = useState(null);
   const router = useRouter();
   const params = useLocalSearchParams();
   const phone = asString(params.phone);
@@ -54,6 +60,32 @@ export default function OTPVerification() {
       return () => clearInterval(interval);
     }
   }, [timer]);
+
+  useEffect(() => {
+    let active = true;
+
+    const preparePushRegistration = async () => {
+      try {
+        const registrationPayload = await preparePushRegistrationPayload();
+        if (!active || !registrationPayload?.expoPushToken) {
+          return;
+        }
+
+        setPushRegistration(registrationPayload);
+        console.log("[auth/otp] prepared Expo push token for OTP verification", {
+          expoPushToken: registrationPayload.expoPushToken,
+        });
+      } catch (error) {
+        console.warn("Push notification preparation before OTP verification failed", error);
+      }
+    };
+
+    preparePushRegistration();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleOtpChange = (value, index) => {
     const digits = value.replace(/\D/g, "");
@@ -95,7 +127,18 @@ export default function OTPVerification() {
     setLoading(true);
 
     try {
-      const response = await verifyOTP(phone, otpCode);
+      const response = await verifyOTP(phone, otpCode, pushRegistration);
+
+      if (pushRegistration?.expoPushToken) {
+        await rememberPushRegistrationSynced(
+          response.user.id,
+          pushRegistration.expoPushToken,
+        );
+      } else {
+        syncPushNotificationsForUser(response.user.id).catch((error) => {
+          console.warn("Push notification sync after login failed", error);
+        });
+      }
 
       if (response.user.hasCompletedProfile) {
         router.replace("/(tabs)");

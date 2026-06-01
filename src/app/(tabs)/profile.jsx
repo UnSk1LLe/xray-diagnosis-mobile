@@ -20,15 +20,19 @@ import {
   getProfileStats,
   logoutUser,
 } from "@/utils/backendApi";
+import {
+  clearStoredPushRegistration,
+  unregisterPushNotificationsForUser,
+} from "@/utils/pushNotifications";
 import { useAppTheme } from "@/utils/theme";
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
   const [stats, setStats] = useState({
     totalScans: 0,
-    normalResults: 0,
-    abnormalResults: 0,
     processing: 0,
+    awaitingReview: 0,
+    reviewedReports: 0,
   });
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -64,9 +68,9 @@ export default function ProfileScreen() {
           console.warn("Error loading profile stats:", statsResult.reason);
           setStats({
             totalScans: 0,
-            normalResults: 0,
-            abnormalResults: 0,
             processing: 0,
+            awaitingReview: 0,
+            reviewedReports: 0,
           });
         } catch (error) {
           if (isMounted) {
@@ -92,10 +96,17 @@ export default function ProfileScreen() {
         style: "destructive",
         onPress: async () => {
           try {
+            try {
+              await unregisterPushNotificationsForUser(profile?.id);
+            } catch (error) {
+              console.warn("Push notification unregister failed:", error);
+            }
+
             await logoutUser();
           } catch (error) {
             console.error("Logout error:", error);
           } finally {
+            await clearStoredPushRegistration();
             await AsyncStorage.multiRemove([
               "isAuthenticated",
               "hasCompletedOnboarding",
@@ -187,13 +198,14 @@ export default function ProfileScreen() {
         <View
           style={{
             flexDirection: "row",
+            flexWrap: "wrap",
             gap: 12,
             marginBottom: 32,
           }}
         >
           <View
             style={{
-              flex: 1,
+              width: "47%",
               backgroundColor: colors.primarySoft,
               borderRadius: 16,
               padding: 20,
@@ -222,7 +234,65 @@ export default function ProfileScreen() {
           </View>
           <View
             style={{
-              flex: 1,
+              width: "47%",
+              backgroundColor: colors.primarySoft,
+              borderRadius: 16,
+              padding: 20,
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: "700",
+                color: colors.primary,
+                marginBottom: 4,
+              }}
+            >
+              {stats.processing}
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: colors.mutedText,
+                textAlign: "center",
+              }}
+            >
+              Processing
+            </Text>
+          </View>
+          <View
+            style={{
+              width: "47%",
+              backgroundColor: colors.warningSoft,
+              borderRadius: 16,
+              padding: 20,
+              alignItems: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: "700",
+                color: colors.warning,
+                marginBottom: 4,
+              }}
+            >
+              {stats.awaitingReview}
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: colors.mutedText,
+                textAlign: "center",
+              }}
+            >
+              Awaiting Review
+            </Text>
+          </View>
+          <View
+            style={{
+              width: "47%",
               backgroundColor: colors.successSoft,
               borderRadius: 16,
               padding: 20,
@@ -237,7 +307,7 @@ export default function ProfileScreen() {
                 marginBottom: 4,
               }}
             >
-              {stats.normalResults}
+              {stats.reviewedReports}
             </Text>
             <Text
               style={{
@@ -246,7 +316,7 @@ export default function ProfileScreen() {
                 textAlign: "center",
               }}
             >
-              Normal Results
+              Reviewed
             </Text>
           </View>
         </View>
